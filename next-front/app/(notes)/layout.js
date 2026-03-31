@@ -130,7 +130,6 @@ const applyWorkspaceSelection = useCallback((workspaceData) => {
       }
 
       const cachedWorkspacesRaw = localStorage.getItem(WORKSPACES_CACHE_KEY);
-      console.log("Cached workspaces raw:", cachedWorkspacesRaw);
       if (cachedWorkspacesRaw) {
         const cachedWorkspaces = JSON.parse(cachedWorkspacesRaw);
         setWorkspaces(cachedWorkspaces);

@@ -43,6 +43,7 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
     handleEnter,
     handlePaste,
     handleFileUpload,
+    handleDeleteEmbeddedFile,
     openDrawingEditor,
     openExistingDrawingEditor,
     handleDrawingSave,
@@ -149,6 +150,7 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
                     singleView={true}
                     shouldLoadLinks={false}
                     showToast={showToast}
+                    onDeleteFile={handleDeleteEmbeddedFile}
                     onExcalidrawEdit={openExistingDrawingEditor}
                     workspaceSlug={selectedWorkspace?.slug}
                   />
@@ -164,6 +166,7 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
                     singleView={true}
                     shouldLoadLinks={false}
                     showToast={showToast}
+                    onDeleteFile={handleDeleteEmbeddedFile}
                     onExcalidrawEdit={openExistingDrawingEditor}
                     workspaceSlug={selectedWorkspace?.slug}
                   />
@@ -191,6 +194,7 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
                 singleView={true}
                 shouldLoadLinks={false}
                 showToast={showToast}
+                onDeleteFile={handleDeleteEmbeddedFile}
                 onExcalidrawEdit={openExistingDrawingEditor}
                 workspaceSlug={selectedWorkspace?.slug}
               />

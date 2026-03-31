@@ -21,9 +21,9 @@ const EditNoteModal = ({
   refreshNotes,
   workspaceSlug = null,
 }) => {
-  const saveHandler = async () => {
-    await onSave();
-    return true;
+  const saveHandler = async (textToSave) => {
+    const result = await onSave(textToSave);
+    return result !== false;
   };
 
   const {
@@ -48,6 +48,7 @@ const EditNoteModal = ({
     handleEnter,
     handlePaste,
     handleFileUpload,
+    handleDeleteEmbeddedFile,
     openDrawingEditor,
     openExistingDrawingEditor,
     handleDrawingSave,
@@ -140,6 +141,7 @@ const EditNoteModal = ({
                   singleView={true}
                   shouldLoadLinks={false}
                   showToast={showToast}
+                  onDeleteFile={handleDeleteEmbeddedFile}
                   onExcalidrawEdit={openExistingDrawingEditor}
                   workspaceSlug={workspaceSlug}
                 />

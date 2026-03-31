@@ -39,7 +39,10 @@ const NoteCard = forwardRef(
     const [showReminderModal, setShowReminderModal] = useState(false);
     const [showOtherCategories, setShowOtherCategories] = useState(false);
     const [showHighlightModal, setShowHighlightModal] = useState(false);
-    const [highlightSelection, setHighlightSelection] = useState({ start: 0, end: 0 });
+    const [highlightSelection, setHighlightSelection] = useState({
+      start: 0,
+      end: 0,
+    });
 
     const handleDeleteFile = (src) => {
       // Remove the markdown link containing this src from the note text
@@ -107,12 +110,18 @@ const NoteCard = forwardRef(
       if (highlightSelection.end <= highlightSelection.start) return;
       const link = `${window.location.origin}/message/${note.id}?highlight_start=${highlightSelection.start}&highlight_end=${highlightSelection.end}`;
       copyTextToClipboard(link);
-      showToast("Success", "Highlight link copied to clipboard", 3000, "success");
+      showToast(
+        "Success",
+        "Highlight link copied to clipboard",
+        3000,
+        "success",
+      );
     };
 
-    const handleSave = async () => {
+    const handleSave = async (textToSave = null) => {
       try {
-        const result = await onEditNote(note.id, editText, note.updated_at);
+        const nextText = textToSave ?? editText;
+        const result = await onEditNote(note.id, nextText, note.updated_at);
         if (result) {
           setShouldLoadLinks(true);
         }
@@ -121,9 +130,10 @@ const NoteCard = forwardRef(
       }
     };
 
-    const handleSaveAndClose = async () => {
+    const handleSaveAndClose = async (textToSave = null) => {
       try {
-        const result = await onEditNote(note.id, editText, note.updated_at);
+        const nextText = textToSave ?? editText;
+        const result = await onEditNote(note.id, nextText, note.updated_at);
         if (result) {
           setShowEditModal(false);
           setShouldLoadLinks(true);
@@ -179,10 +189,12 @@ const NoteCard = forwardRef(
                   <Dropdown.Item onClick={copyNoteLink}>
                     Copy Link
                   </Dropdown.Item>
-                  <Dropdown.Item onClick={() => {
-                    setHighlightSelection({ start: 0, end: 0 });
-                    setShowHighlightModal(true);
-                  }}>
+                  <Dropdown.Item
+                    onClick={() => {
+                      setHighlightSelection({ start: 0, end: 0 });
+                      setShowHighlightModal(true);
+                    }}
+                  >
                     Highlight Link
                   </Dropdown.Item>
                   {!hideEdits && !singleView && (
@@ -330,12 +342,18 @@ const NoteCard = forwardRef(
           showToast={showToast}
         />
 
-        <Modal show={showHighlightModal} onHide={() => setShowHighlightModal(false)} size="lg">
+        <Modal
+          show={showHighlightModal}
+          onHide={() => setShowHighlightModal(false)}
+          size="lg"
+        >
           <Modal.Header closeButton>
             <Modal.Title>Copy Highlight Link</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <p className="text-muted mb-2">Select the text you want to highlight, then copy the link.</p>
+            <p className="text-muted mb-2">
+              Select the text you want to highlight, then copy the link.
+            </p>
             <SelectableTextContainer
               text={note.text}
               selectionRange={highlightSelection}
@@ -343,7 +361,10 @@ const NoteCard = forwardRef(
             />
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowHighlightModal(false)}>
+            <Button
+              variant="secondary"
+              onClick={() => setShowHighlightModal(false)}
+            >
               Close
             </Button>
             <Button

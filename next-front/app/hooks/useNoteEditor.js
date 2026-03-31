@@ -26,6 +26,7 @@ const useNoteEditor = ({
   const [isDrawingLoading, setIsDrawingLoading] = useState(false);
   const [drawingInitialData, setDrawingInitialData] = useState(null);
   const [activeDrawing, setActiveDrawing] = useState(null);
+  const uploadedFileIdsByUrlRef = useRef({});
   const editMessageTextAreaRef = useRef(null);
 
   const hasUnsavedChanges = editText !== lastSavedText;
@@ -118,7 +119,11 @@ const useNoteEditor = ({
       throw new Error("Failed to upload file");
     }
 
-    return response.json();
+    const data = await response.json();
+    if (data?.url && data?.file_id) {
+      uploadedFileIdsByUrlRef.current[data.url] = data.file_id;
+    }
+    return data;
   };
 
   const handleFileUpload = (data) => {
@@ -176,8 +181,8 @@ const useNoteEditor = ({
     setActiveDrawing(null);
   };
 
-  const openExistingDrawingEditor = async ({ id, sceneUrl }) => {
-    setActiveDrawing({ id, sceneUrl });
+  const openExistingDrawingEditor = async ({ id, sceneUrl, imageUrl }) => {
+    setActiveDrawing({ id, sceneUrl, imageUrl });
     setShowDrawingEditor(true);
     setIsDrawingLoading(true);
 
@@ -248,6 +253,30 @@ const useNoteEditor = ({
         uploadFile(drawingFile),
       ]);
 
+      const tryDeleteUploadedFileByUrl = async (url) => {
+        if (!url) return;
+        const fileId = uploadedFileIdsByUrlRef.current[url];
+        if (!fileId) return;
+
+        try {
+          const response = await fetchWithAuth(`/api/note/files/${fileId}/`, {
+            method: "DELETE",
+          });
+          if (response.ok) {
+            delete uploadedFileIdsByUrlRef.current[url];
+          }
+        } catch (err) {
+          console.error("Error deleting replaced drawing file:", err);
+        }
+      };
+
+      if (activeDrawing?.id) {
+        await Promise.all([
+          tryDeleteUploadedFileByUrl(activeDrawing.imageUrl),
+          tryDeleteUploadedFileByUrl(activeDrawing.sceneUrl),
+        ]);
+      }
+
       const drawingId = activeDrawing?.id || createExcalidrawEmbedId();
       const embedLine = createExcalidrawEmbedLine({
         id: drawingId,
@@ -255,12 +284,16 @@ const useNoteEditor = ({
         sceneUrl: sceneUpload.url,
       });
 
-      setEditText((prevText) => {
-        if (activeDrawing?.id) {
-          return replaceExcalidrawEmbedLine(prevText, activeDrawing.id, embedLine);
-        }
-        return prevText + (prevText ? "\n" : "") + embedLine;
-      });
+      const nextText = activeDrawing?.id
+        ? replaceExcalidrawEmbedLine(editText, activeDrawing.id, embedLine)
+        : editText + (editText ? "\n" : "") + embedLine;
+
+      setEditText(nextText);
+
+      const saveResult = await saveHandler(nextText);
+      if (saveResult) {
+        setLastSavedText(nextText);
+      }
 
       showToast("Success", "Drawing saved", 3000, "success");
       closeDrawingEditor();
@@ -268,6 +301,20 @@ const useNoteEditor = ({
       console.error("Error saving drawing:", err);
       handleApiError(err);
     }
+  };
+
+  const handleDeleteEmbeddedFile = (src) => {
+    const escapedSrc = src.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const imageRegex = new RegExp(`!\\[[^\\]]*\\]\\(${escapedSrc}\\)\\n?`, "g");
+    const linkRegex = new RegExp(`\\[[^\\]]*\\]\\(${escapedSrc}\\)\\n?`, "g");
+
+    setEditText((prevText) => {
+      const withoutImages = prevText.replace(imageRegex, "");
+      const withoutLinks = withoutImages.replace(linkRegex, "");
+      return withoutLinks.replace(/\n{3,}/g, "\n\n").trimEnd();
+    });
+
+    showToast("Success", "File removed from note", 2500, "success");
   };
 
   const increaseImportance = async () => {
@@ -380,6 +427,7 @@ const useNoteEditor = ({
     handleEnter,
     handlePaste,
     handleFileUpload,
+    handleDeleteEmbeddedFile,
     openDrawingEditor,
     openExistingDrawingEditor,
     handleDrawingSave,

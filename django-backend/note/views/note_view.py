@@ -172,6 +172,7 @@ class SingleNoteView(APIView):
     def put(self, request, **kwargs):
         try:
             item = LocalMessage.objects.get(pk=kwargs['note_id'], user=request.user)
+            previous_text = item.text or ""
             new_text = request.data.get("text")
             client_updated_at = request.data.get("updated_at")
             if not client_updated_at:
@@ -191,8 +192,21 @@ class SingleNoteView(APIView):
             insert_links(item)
             executor.submit(create_embeddings_async, item.id, new_text)
             item.refresh_from_db()
+
+            file_manager = FileManager()
+            previous_paths = set(file_manager.extract_file_paths(previous_text))
+            current_paths = set(file_manager.extract_file_paths(item.text or ""))
+            removed_paths = list(previous_paths - current_paths)
+            deleted_files = file_manager.cleanup_orphaned_files_for_removed_paths(
+                removed_paths,
+                item.id,
+                request.user,
+            )
+
             serialized = self.serializer_class(item)
-            return Response(serialized.data, status=status.HTTP_200_OK)
+            payload = serialized.data
+            payload["deleted_files"] = deleted_files
+            return Response(payload, status=status.HTTP_200_OK)
         except LocalMessage.DoesNotExist:
             return Response({"error": "Note not found"}, status=status.HTTP_404_NOT_FOUND)
 

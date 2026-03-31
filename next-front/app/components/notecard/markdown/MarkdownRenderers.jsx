@@ -216,7 +216,12 @@ export const createCustomRenderers = (
         <button
           type="button"
           className="w-100 border-0 bg-transparent p-0 text-start"
-          onClick={() => onExcalidrawEdit(drawingMeta)}
+          onClick={() =>
+            onExcalidrawEdit({
+              ...drawingMeta,
+              imageUrl: encodedSrc,
+            })
+          }
         >
           {imageContent}
         </button>

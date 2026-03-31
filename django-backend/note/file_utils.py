@@ -13,12 +13,52 @@ class FileManager:
             secure=settings.MINIO_USE_SSL
         )
         
+    def _extract_path_from_url(self, file_url: str):
+        prefix = '/api/note/files/'
+        if not file_url or not file_url.startswith(prefix):
+            return None
+
+        path = file_url[len(prefix):]
+        path = path.split('?')[0].split('#')[0].rstrip('/')
+
+        if not path or '](' in path or '[' in path or ']' in path:
+            return None
+
+        return path
+
     def extract_file_paths(self, markdown_text: str) -> List[str]:
         """Extract file paths from markdown text that match our API pattern."""
-        # Pattern to match URLs like /api/note/files/uploads/...
-        pattern = r'/api/note/files/([^\s\)\"\']+)'
-        matches = re.finditer(pattern, markdown_text)
-        return [match.group(1) for match in matches]
+        if not markdown_text:
+            return []
+
+        extracted_paths = []
+        seen = set()
+
+        excalidraw_pattern = re.compile(
+            r'!\[excalidraw\|[^|\]]+\|(/api/note/files/[^\]\s]+)\]\((/api/note/files/[^\)\s]+)\)'
+        )
+
+        for match in excalidraw_pattern.finditer(markdown_text):
+            scene_url = match.group(1)
+            image_url = match.group(2)
+            for file_url in (scene_url, image_url):
+                path = self._extract_path_from_url(file_url)
+                if path and path not in seen:
+                    extracted_paths.append(path)
+                    seen.add(path)
+
+        general_pattern = re.compile(r'\((/api/note/files/[^\)\s\"\']+)\)')
+        for match in general_pattern.finditer(markdown_text):
+            file_url = match.group(1)
+            path = self._extract_path_from_url(file_url)
+            if path and path not in seen:
+                extracted_paths.append(path)
+                seen.add(path)
+
+        return extracted_paths
+
+    def normalize_to_minio_path(self, extracted_path: str) -> str:
+        return extracted_path.replace("note/", "")
     
     def is_file_referenced(self, file_path: str, exclude_note_id: int = None) -> bool:
         """Check if a file is referenced in any other notes."""
@@ -69,7 +109,7 @@ class FileManager:
         associations_created = 0
         
         for path in file_paths:
-            minio_path = path.replace("note/", "")
+            minio_path = self.normalize_to_minio_path(path)
             should_associate.add(minio_path)
             
             file_obj, created = File.objects.get_or_create(
@@ -100,6 +140,30 @@ class FileManager:
                 pass
         
         return associations_created
+
+    def cleanup_orphaned_files_for_removed_paths(self, removed_paths: List[str], note_id: int, user) -> List[str]:
+        """
+        For paths removed from a note, delete File objects that are no longer referenced
+        by any note or collection. Returns deleted minio paths.
+        """
+        deleted_paths = []
+
+        for extracted_path in removed_paths:
+            if self.is_file_referenced(extracted_path, exclude_note_id=note_id):
+                continue
+
+            minio_path = self.normalize_to_minio_path(extracted_path)
+            file_obj = File.objects.filter(minio_path=minio_path, user=user).first()
+            if not file_obj:
+                continue
+
+            if file_obj.notes.exclude(id=note_id).exists() or file_obj.collections.exists():
+                continue
+
+            file_obj.delete()
+            deleted_paths.append(minio_path)
+
+        return deleted_paths
     
 from django.utils import timezone
 from datetime import timedelta
