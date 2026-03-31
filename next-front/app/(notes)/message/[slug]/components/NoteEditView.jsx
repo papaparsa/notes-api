@@ -8,6 +8,7 @@ import editStyles from "./NoteEditView.module.css";
 import NoteTextRenderer from "../../../../components/notecard/markdown/MarkdownRenderers";
 import RevisionHistoryModal from "../../../../components/notecard/RevisionHistoryModal";
 import EditNoteButtons from "../../../../components/notecard/EditNoteButtons";
+import ExcalidrawOverlay from "../../../../components/notecard/ExcalidrawOverlay";
 import SplitViewToggleButton from "./SplitViewToggleButton";
 import { ToastContext, WorkspaceContext } from "../../../layout";
 import useNoteEditor from "../../../../hooks/useNoteEditor";
@@ -27,6 +28,10 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
     showConfirmDialog,
     showRevisionModal,
     setShowRevisionModal,
+    showDrawingEditor,
+    closeDrawingEditor,
+    isDrawingLoading,
+    drawingInitialData,
     editMessageTextAreaRef,
     hasUnsavedChanges,
     handleSave,
@@ -38,6 +43,9 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
     handleEnter,
     handlePaste,
     handleFileUpload,
+    openDrawingEditor,
+    openExistingDrawingEditor,
+    handleDrawingSave,
     toggleEditorRtl,
     increaseImportance,
     decreaseImportance,
@@ -114,6 +122,7 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
           unHideMessage={unHideMessage}
           setShowRevisionModal={setShowRevisionModal}
           handleQuoteToggle={handleQuoteToggle}
+          openDrawingEditor={openDrawingEditor}
         />
 
         {/* Desktop layout */}
@@ -140,6 +149,7 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
                     singleView={true}
                     shouldLoadLinks={false}
                     showToast={showToast}
+                    onExcalidrawEdit={openExistingDrawingEditor}
                     workspaceSlug={selectedWorkspace?.slug}
                   />
                 </div>
@@ -154,6 +164,7 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
                     singleView={true}
                     shouldLoadLinks={false}
                     showToast={showToast}
+                    onExcalidrawEdit={openExistingDrawingEditor}
                     workspaceSlug={selectedWorkspace?.slug}
                   />
                 </div>
@@ -180,6 +191,7 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
                 singleView={true}
                 shouldLoadLinks={false}
                 showToast={showToast}
+                onExcalidrawEdit={openExistingDrawingEditor}
                 workspaceSlug={selectedWorkspace?.slug}
               />
             </div>
@@ -222,6 +234,14 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
         show={showRevisionModal}
         onHide={() => setShowRevisionModal(false)}
         noteId={note.id}
+      />
+
+      <ExcalidrawOverlay
+        show={showDrawingEditor}
+        onHide={closeDrawingEditor}
+        onSave={handleDrawingSave}
+        initialData={drawingInitialData}
+        isLoading={isDrawingLoading}
       />
     </>
   );

@@ -28,6 +28,7 @@ const EditNoteButtons = ({
   unHideMessage,
   setShowRevisionModal,
   handleQuoteToggle,
+  openDrawingEditor,
 }) => {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
@@ -97,6 +98,13 @@ const EditNoteButtons = ({
             className="btn-sm"
           />
           <QuoteToggleButton onClick={handleQuoteToggle} className="btn-sm" />
+          <Button
+            variant="outline-secondary"
+            onClick={openDrawingEditor}
+            className="btn-sm"
+          >
+            Draw
+          </Button>
           <PreviewToggleButton
             className="btn-sm"
             isPreviewMode={isPreviewMode}
@@ -190,6 +198,13 @@ const EditNoteButtons = ({
                 onClick={handleQuoteToggle}
                 className="btn-sm"
               />
+              <Button
+                variant="outline-secondary"
+                onClick={openDrawingEditor}
+                className="btn-sm"
+              >
+                Draw
+              </Button>
             </div>
           </div>
         )}

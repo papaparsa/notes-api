@@ -13,6 +13,7 @@ import { safeUrlEncode, isExternalLink } from "./UrlUtils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useExternalLink } from "../ExternalLinkModal";
+import { parseExcalidrawAlt } from "../../../utils/excalidrawEmbed";
 
 // Remark plugin to highlight text based on character indices
 export const createHighlightPlugin = (start, end) => {
@@ -114,6 +115,7 @@ export const createCustomRenderers = (
   showToast,
   openExternalLink,
   onDeleteFile,
+  onExcalidrawEdit,
 ) => {
   return {
     p: (props) => <p {...props} />,
@@ -204,12 +206,30 @@ export const createCustomRenderers = (
     img: (props) => {
       const encodedSrc = safeUrlEncode(props.src);
       const isFile = encodedSrc.includes("/api/note/files/");
+      const drawingMeta = parseExcalidrawAlt(props.alt || "");
+
+      const imageContent = <ResponsiveImage {...props} src={encodedSrc} />;
+      const canEditDrawing =
+        drawingMeta && typeof onExcalidrawEdit === "function";
+
+      const maybeClickableContent = canEditDrawing ? (
+        <button
+          type="button"
+          className="w-100 border-0 bg-transparent p-0 text-start"
+          onClick={() => onExcalidrawEdit(drawingMeta)}
+        >
+          {imageContent}
+        </button>
+      ) : (
+        imageContent
+      );
+
       if (isFile && singleView) {
         return (
           <div
             style={{ position: "relative", display: "block", width: "100%" }}
           >
-            <ResponsiveImage {...props} src={encodedSrc} />
+            {maybeClickableContent}
             <Button
               variant="danger"
               size="sm"
@@ -226,7 +246,7 @@ export const createCustomRenderers = (
           </div>
         );
       }
-      return <ResponsiveImage {...props} src={encodedSrc} />;
+      return maybeClickableContent;
     },
     td: (props) => {
       // add padding to table cells
@@ -342,6 +362,7 @@ const DisplayRenderer = ({
   highlightStart = null,
   highlightEnd = null,
   onDeleteFile = () => {},
+  onExcalidrawEdit = null,
 }) => {
   const { openExternalLink } = useExternalLink();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -372,6 +393,7 @@ const DisplayRenderer = ({
     showToast,
     openExternalLink,
     handleDeleteClick,
+    onExcalidrawEdit,
   );
 
   let textToRender =
@@ -432,6 +454,7 @@ const NoteTextRenderer = ({
   shouldLoadLinks = true,
   showToast = () => {},
   onDeleteFile = () => {},
+  onExcalidrawEdit = null,
 }) => {
   const searchParams = useSearchParams();
   const highlightStart = searchParams
@@ -468,6 +491,7 @@ const NoteTextRenderer = ({
       highlightStart={!isNaN(highlightStart) ? highlightStart : null}
       highlightEnd={!isNaN(highlightEnd) ? highlightEnd : null}
       onDeleteFile={onDeleteFile}
+      onExcalidrawEdit={onExcalidrawEdit}
     />
   );
 };

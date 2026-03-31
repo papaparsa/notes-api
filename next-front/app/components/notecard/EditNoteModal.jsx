@@ -5,6 +5,7 @@ import styles from "./NoteCard.module.css";
 import NoteTextRenderer from "./markdown/MarkdownRenderers";
 import RevisionHistoryModal from "./RevisionHistoryModal";
 import EditNoteButtons from "./EditNoteButtons";
+import ExcalidrawOverlay from "./ExcalidrawOverlay";
 import useNoteEditor from "../../hooks/useNoteEditor";
 
 const EditNoteModal = ({
@@ -32,6 +33,10 @@ const EditNoteModal = ({
     showConfirmDialog,
     showRevisionModal,
     setShowRevisionModal,
+    showDrawingEditor,
+    closeDrawingEditor,
+    isDrawingLoading,
+    drawingInitialData,
     editMessageTextAreaRef,
     hasUnsavedChanges,
     handleSave,
@@ -43,6 +48,9 @@ const EditNoteModal = ({
     handleEnter,
     handlePaste,
     handleFileUpload,
+    openDrawingEditor,
+    openExistingDrawingEditor,
+    handleDrawingSave,
     toggleEditorRtl,
     increaseImportance,
     decreaseImportance,
@@ -121,6 +129,7 @@ const EditNoteModal = ({
             unHideMessage={unHideMessage}
             setShowRevisionModal={setShowRevisionModal}
             handleQuoteToggle={handleQuoteToggle}
+            openDrawingEditor={openDrawingEditor}
           />
 
           <div className="position-relative">
@@ -131,6 +140,7 @@ const EditNoteModal = ({
                   singleView={true}
                   shouldLoadLinks={false}
                   showToast={showToast}
+                  onExcalidrawEdit={openExistingDrawingEditor}
                   workspaceSlug={workspaceSlug}
                 />
               </div>
@@ -183,6 +193,14 @@ const EditNoteModal = ({
         show={showRevisionModal}
         onHide={() => setShowRevisionModal(false)}
         noteId={note.id}
+      />
+
+      <ExcalidrawOverlay
+        show={showDrawingEditor}
+        onHide={closeDrawingEditor}
+        onSave={handleDrawingSave}
+        initialData={drawingInitialData}
+        isLoading={isDrawingLoading}
       />
     </>
   );

@@ -1,6 +1,11 @@
 import { useRef, useEffect, useState } from "react";
 import { fetchWithAuth } from "../lib/api";
 import { handleApiError } from "../utils/errorHandler";
+import {
+  createExcalidrawEmbedId,
+  createExcalidrawEmbedLine,
+  replaceExcalidrawEmbedLine,
+} from "../utils/excalidrawEmbed";
 
 const useNoteEditor = ({
   note,
@@ -17,6 +22,10 @@ const useNoteEditor = ({
   const [lastSavedText, setLastSavedText] = useState(editText);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [showDrawingEditor, setShowDrawingEditor] = useState(false);
+  const [isDrawingLoading, setIsDrawingLoading] = useState(false);
+  const [drawingInitialData, setDrawingInitialData] = useState(null);
+  const [activeDrawing, setActiveDrawing] = useState(null);
   const editMessageTextAreaRef = useRef(null);
 
   const hasUnsavedChanges = editText !== lastSavedText;
@@ -96,6 +105,22 @@ const useNoteEditor = ({
     }
   };
 
+  const uploadFile = async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetchWithAuth("/api/note/upload/", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to upload file");
+    }
+
+    return response.json();
+  };
+
   const handleFileUpload = (data) => {
     const decodedUrl = decodeURIComponent(data.url);
     const fileName = data.file_name;
@@ -105,7 +130,6 @@ const useNoteEditor = ({
   };
 
   const handleImageUpload = async (file) => {
-    const formData = new FormData();
     const timestamp = new Date()
       .toISOString()
       .replace(/[-:]/g, "")
@@ -115,15 +139,8 @@ const useNoteEditor = ({
     const renamedFile = new File([file], `${uniqueFileName}.png`, {
       type: file.type,
     });
-    formData.append("file", renamedFile);
-
     try {
-      const response = await fetchWithAuth("/api/note/upload/", {
-        method: "POST",
-        body: formData,
-      });
-      if (!response.ok) throw new Error("Failed to upload image");
-      const data = await response.json();
+      const data = await uploadFile(renamedFile);
       const imageMarkdown = `![${data.file_name}](${data.url})`;
       setEditText(
         (prevText) => prevText + (prevText ? "\n" : "") + imageMarkdown,
@@ -143,6 +160,113 @@ const useNoteEditor = ({
         await handleImageUpload(blob);
         break;
       }
+    }
+  };
+
+  const openDrawingEditor = () => {
+    setActiveDrawing(null);
+    setDrawingInitialData(null);
+    setShowDrawingEditor(true);
+  };
+
+  const closeDrawingEditor = () => {
+    setShowDrawingEditor(false);
+    setIsDrawingLoading(false);
+    setDrawingInitialData(null);
+    setActiveDrawing(null);
+  };
+
+  const openExistingDrawingEditor = async ({ id, sceneUrl }) => {
+    setActiveDrawing({ id, sceneUrl });
+    setShowDrawingEditor(true);
+    setIsDrawingLoading(true);
+
+    try {
+      const response = await fetchWithAuth(sceneUrl, { method: "GET" });
+      if (!response.ok) {
+        throw new Error("Failed to load drawing");
+      }
+      const sceneData = await response.json();
+      setDrawingInitialData(sceneData);
+    } catch (err) {
+      console.error("Error loading drawing:", err);
+      handleApiError(err);
+      setShowDrawingEditor(false);
+      setActiveDrawing(null);
+      setDrawingInitialData(null);
+    } finally {
+      setIsDrawingLoading(false);
+    }
+  };
+
+  const handleDrawingSave = async ({ elements, appState, files }) => {
+    try {
+      const { exportToBlob } = await import("@excalidraw/excalidraw");
+      const imageBlob = await exportToBlob({
+        elements,
+        appState,
+        files,
+        mimeType: "image/png",
+      });
+
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace("T", "_")
+        .split(".")[0];
+
+      const imageFile = new File([imageBlob], `drawing_${timestamp}.png`, {
+        type: "image/png",
+      });
+
+      const drawingPayload = {
+        type: "excalidraw",
+        version: 2,
+        source: "notes-api",
+        elements,
+        appState: {
+          ...appState,
+          collaborators: [],
+        },
+        files,
+      };
+
+      const drawingBlob = new Blob([JSON.stringify(drawingPayload)], {
+        type: "application/json",
+      });
+
+      const drawingFile = new File(
+        [drawingBlob],
+        `drawing_${timestamp}.excalidraw.json`,
+        {
+          type: "application/json",
+        },
+      );
+
+      const [imageUpload, sceneUpload] = await Promise.all([
+        uploadFile(imageFile),
+        uploadFile(drawingFile),
+      ]);
+
+      const drawingId = activeDrawing?.id || createExcalidrawEmbedId();
+      const embedLine = createExcalidrawEmbedLine({
+        id: drawingId,
+        imageUrl: imageUpload.url,
+        sceneUrl: sceneUpload.url,
+      });
+
+      setEditText((prevText) => {
+        if (activeDrawing?.id) {
+          return replaceExcalidrawEmbedLine(prevText, activeDrawing.id, embedLine);
+        }
+        return prevText + (prevText ? "\n" : "") + embedLine;
+      });
+
+      showToast("Success", "Drawing saved", 3000, "success");
+      closeDrawingEditor();
+    } catch (err) {
+      console.error("Error saving drawing:", err);
+      handleApiError(err);
     }
   };
 
@@ -241,6 +365,10 @@ const useNoteEditor = ({
     showConfirmDialog,
     showRevisionModal,
     setShowRevisionModal,
+    showDrawingEditor,
+    closeDrawingEditor,
+    isDrawingLoading,
+    drawingInitialData,
     editMessageTextAreaRef,
     hasUnsavedChanges,
     handleSave,
@@ -252,6 +380,9 @@ const useNoteEditor = ({
     handleEnter,
     handlePaste,
     handleFileUpload,
+    openDrawingEditor,
+    openExistingDrawingEditor,
+    handleDrawingSave,
     toggleEditorRtl,
     increaseImportance,
     decreaseImportance,
