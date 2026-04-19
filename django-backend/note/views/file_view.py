@@ -180,7 +180,7 @@ class FileUploadView(APIView):
                 file_size,
                 content_type=content_type
             )
-            return f"{settings.MINIO_BUCKET_NAME}/{object_name}"
+            return object_name
         except S3Error as e:
             print(f"Error saving to MinIO: {e}")
             return None
@@ -244,9 +244,10 @@ class FileUploadView(APIView):
                 'duplicate': True
             }, status=status.HTTP_200_OK)
 
-        url = "/api/note/files/" + self.save_to_minio(file_data, object_name, content_type)
-        
-        if url:
+        saved_path = self.save_to_minio(file_data, object_name, content_type)
+
+        if saved_path:
+            url = f"/api/note/files/{saved_path}"
             file_obj = File.objects.create(
                 name=display_name,
                 original_name=file.name,

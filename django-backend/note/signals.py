@@ -74,5 +74,4 @@ def trigger_file_sync(sender, instance, created, **kwargs):
     """
     Signal to trigger asynchronous file association sync for notes
     """
-    if not created:
-        sync_note_files_async(instance.id)
+    sync_note_files_async(instance.id)
