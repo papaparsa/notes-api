@@ -199,15 +199,19 @@ class SingleNoteView(APIView):
     def delete(self, request, **kwargs):
         try:
             item = LocalMessage.objects.get(pk=kwargs['note_id'], user=request.user)
-            
-            # Initialize file manager and clean up unused files
+
             file_manager = FileManager()
-            deleted_files = file_manager.delete_unused_files(item.text, item.id)
-            print(f"deleted files are {deleted_files}")
-            
+            file_manager.sync_note_files(item)
+            associated_files = list(item.files.all())
+
             item.delete()
-            
-            # Return success response with info about deleted files
+
+            deleted_files = []
+            for file_obj in associated_files:
+                if not file_obj.notes.exists() and not file_obj.collections.exists():
+                    deleted_files.append(file_obj.minio_path)
+                    file_obj.delete()
+
             return Response({
                 "message": "Note deleted successfully",
                 "deleted_files": deleted_files
