@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useContext } from "react";
 import { Spinner } from "react-bootstrap";
 import NoteCard from "./notecard/NoteCard";
 import { fetchWithAuth } from "../lib/api";
 import { handleApiError } from "../utils/errorHandler";
+import { ToastContext } from "../(notes)/layout";
 import styles from "./NoteList.module.css";
 
 export default function NoteList({
@@ -21,6 +22,7 @@ export default function NoteList({
   const noteRefs = useRef({});
   const [animatingNotes, setAnimatingNotes] = useState(new Set());
   const [highlightedNote, setHighlightedNote] = useState(null);
+  const showToast = useContext(ToastContext);
 
   useEffect(() => {
     if (newNoteId) {
@@ -58,27 +60,6 @@ export default function NoteList({
     }
   }, [highlightNoteId, isBusy, notes]);
 
-  const handleImportanceUpdate = async (note, increase) => {
-    window.dispatchEvent(
-      new CustomEvent("showWaitingModal", { detail: "Updating note" }),
-    );
-    try {
-      const action = increase ? "increase_importance" : "decrease_importance";
-      const url = `/api/note/message/${action}/${note.id}/`;
-      const response = await fetchWithAuth(url, { method: "POST" });
-      if (!response.ok) throw new Error("Failed to update importance");
-
-      onUpdateNote(note.id, {
-        importance: increase ? note.importance + 1 : note.importance - 1,
-      });
-      refreshNotes();
-    } catch (err) {
-      console.error("Error updating importance:", err);
-      handleApiError(err);
-    } finally {
-      window.dispatchEvent(new CustomEvent("hideWaitingModal"));
-    }
-  };
 
   const handleArchiveUpdate = async (note, archived) => {
     window.dispatchEvent(
@@ -123,16 +104,7 @@ export default function NoteList({
         toastBody += `\nRemoved ${fileNames.length} unused ${fileNames.length === 1 ? "file" : "files"}: ${fileNames.join(", ")}`;
       }
 
-      window.dispatchEvent(
-        new CustomEvent("showToast", {
-          detail: {
-            title: "Success",
-            body: toastBody,
-            delay: 5000,
-            variant: "success",
-          },
-        }),
-      );
+      showToast("Success", toastBody, 5000, "success");
     } catch (err) {
       console.error("Error deleting note:", err);
       handleApiError(err);
@@ -159,16 +131,7 @@ export default function NoteList({
       const updatedNote = await response.json();
       onUpdateNote(noteId, updatedNote);
 
-      window.dispatchEvent(
-        new CustomEvent("showToast", {
-          detail: {
-            title: "Success",
-            body: "Note Saved",
-            delay: 5000,
-            variant: "success",
-          },
-        }),
-      );
+      showToast("Success", "Note Saved", 5000, "success");
 
       return true;
     } catch (err) {

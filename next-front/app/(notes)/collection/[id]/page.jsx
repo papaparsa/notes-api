@@ -77,7 +77,7 @@ export default function CollectionPage() {
     const fileId = uploadedFile.file_id || uploadedFile.file?.id;
 
     if (!fileId) {
-      showToast("Error: No file ID received from upload", "error");
+      showToast("Error", "No file ID received from upload", 3000, "danger");
       return;
     }
 
@@ -236,7 +236,12 @@ export default function CollectionPage() {
       );
     } catch (error) {
       handleApiError(error, showToast);
-      showToast(`Failed to upload "${file.name}"`, "error");
+      showToast(
+        "Error",
+        `Failed to upload "${file.name}"`,
+        3000,
+        "danger",
+      );
     } finally {
       setUploading(false);
     }

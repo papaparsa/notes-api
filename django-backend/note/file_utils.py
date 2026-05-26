@@ -1,5 +1,6 @@
 import re
 from typing import List
+from urllib.parse import urlsplit, unquote
 from django.conf import settings
 from minio import Minio
 from .models import LocalMessage, File
@@ -57,113 +58,72 @@ class FileManager:
 
         return extracted_paths
 
-    def normalize_to_minio_path(self, extracted_path: str) -> str:
-        return extracted_path.replace("note/", "")
-    
-    def is_file_referenced(self, file_path: str, exclude_note_id: int = None) -> bool:
-        """Check if a file is referenced in any other notes."""
-        # Query all notes except the one being deleted
-        notes = LocalMessage.objects.exclude(id=exclude_note_id) if exclude_note_id else LocalMessage.objects.all()
-        
+    def normalize_file_path(self, raw_path: str) -> str:
+        if not raw_path:
+            return ""
 
-        # Check each note's content for the file reference
-        for note in notes:
-            if file_path in note.text:
-                return True
-        return False
-    
-    def delete_unused_files(self, note_text: str, note_id: int) -> List[str]:
-        """Delete files that are no longer referenced in any notes."""
-        deleted_files = []
-        file_paths = self.extract_file_paths(note_text)
-        
-        print(f"found file paths {file_paths}")
+        path = urlsplit(raw_path).path if "://" in raw_path else raw_path
+        path = unquote(path.strip().lstrip('/'))
 
-        for file_path in file_paths:
-            if not self.is_file_referenced(file_path, exclude_note_id=note_id):
-                # remove the leading note/ prefix
-                file_path = file_path.replace("note/", "")
-                try:
-                    self.minio_client.remove_object(
-                        bucket_name=settings.MINIO_BUCKET_NAME,
-                        object_name=file_path
-                    )
-                    deleted_files.append(file_path)
-                except Exception as e:
-                    print(f"Error deleting file {file_path}: {e}")
-            else: 
-                print(f"file {file_path} was referenced elsewhere!")
-                    
-        return deleted_files
+        if path.startswith('api/note/files/'):
+            path = path[len('api/note/files/'):]
+
+        if path.startswith('note/'):
+            path = path[len('note/'):]
+
+        bucket_prefix = f"{settings.MINIO_BUCKET_NAME}/"
+        if path.startswith(bucket_prefix):
+            path = path[len(bucket_prefix):]
+
+        return path
+
+    def extract_normalized_file_paths(self, markdown_text: str) -> List[str]:
+        normalized_paths = []
+        seen = set()
+
+        for raw_path in self.extract_file_paths(markdown_text):
+            normalized = self.normalize_file_path(raw_path)
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                normalized_paths.append(normalized)
+
+        return normalized_paths
     
+
+        
     def sync_note_files(self, note: LocalMessage) -> int:
-        """
-        Sync file associations with files referenced in note markdown.
-        Adds associations for newly referenced files and removes associations for files no longer referenced.
-        Returns the number of new associations created.
-        """
-        file_paths = self.extract_file_paths(note.text)
-        
-        # Files that should be associated based on current text
-        should_associate = set()
+        should_associate = set(self.extract_normalized_file_paths(note.text))
         associations_created = 0
-        
-        for path in file_paths:
-            minio_path = self.normalize_to_minio_path(path)
-            should_associate.add(minio_path)
-            
-            file_obj, created = File.objects.get_or_create(
-                minio_path=minio_path,
-                defaults={
-                    'name': minio_path.split('/')[-1],
-                    'original_name': minio_path.split('/')[-1],
-                    'size': 0,
-                    'content_type': 'unknown',
-                    'user': note.user
-                }
-            )
-            
+
+        for minio_path in should_associate:
+            file_obj = File.objects.filter(minio_path=minio_path, user=note.user).first()
+            if not file_obj:
+                file_obj = File.objects.create(
+                    minio_path=minio_path,
+                    name=minio_path.split('/')[-1],
+                    original_name=minio_path.split('/')[-1],
+                    size=0,
+                    content_type='unknown',
+                    user=note.user
+                )
+
             if not note.files.filter(id=file_obj.id).exists():
                 note.files.add(file_obj)
                 associations_created += 1
-        
+
         # Remove associations for files no longer referenced
-        current_associated = set(note.files.values_list('minio_path', flat=True))
+        current_associated = set(
+            note.files.filter(user=note.user).values_list('minio_path', flat=True)
+        )
         to_remove = current_associated - should_associate
-        
+
         for minio_path in to_remove:
-            try:
-                file_obj = File.objects.get(minio_path=minio_path, user=note.user)
+            file_obj = note.files.filter(minio_path=minio_path, user=note.user).first()
+            if file_obj:
                 note.files.remove(file_obj)
-            except File.DoesNotExist:
-                # File might have been deleted, skip
-                pass
-        
+
         return associations_created
 
-    def cleanup_orphaned_files_for_removed_paths(self, removed_paths: List[str], note_id: int, user) -> List[str]:
-        """
-        For paths removed from a note, delete File objects that are no longer referenced
-        by any note or collection. Returns deleted minio paths.
-        """
-        deleted_paths = []
-
-        for extracted_path in removed_paths:
-            if self.is_file_referenced(extracted_path, exclude_note_id=note_id):
-                continue
-
-            minio_path = self.normalize_to_minio_path(extracted_path)
-            file_obj = File.objects.filter(minio_path=minio_path, user=user).first()
-            if not file_obj:
-                continue
-
-            if file_obj.notes.exclude(id=note_id).exists() or file_obj.collections.exists():
-                continue
-
-            file_obj.delete()
-            deleted_paths.append(minio_path)
-
-        return deleted_paths
     
 from django.utils import timezone
 from datetime import timedelta
