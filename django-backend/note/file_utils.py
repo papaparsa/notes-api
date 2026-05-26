@@ -51,37 +51,7 @@ class FileManager:
 
         return normalized_paths
     
-    def is_file_referenced(self, file_path: str, exclude_note_id: int = None) -> bool:
-        """Check if a file is referenced in any other notes."""
-        normalized_file_path = self.normalize_file_path(file_path)
-        if not normalized_file_path:
-            return False
 
-        # Query all notes except the one being deleted
-        notes = LocalMessage.objects.exclude(id=exclude_note_id) if exclude_note_id else LocalMessage.objects.all()
-
-        for note in notes:
-            if normalized_file_path in self.extract_normalized_file_paths(note.text):
-                return True
-        return False
-    
-    def delete_unused_files(self, note_text: str, note_id: int) -> List[str]:
-        """Delete files that are no longer referenced in any notes."""
-        deleted_files = []
-        file_paths = self.extract_normalized_file_paths(note_text)
-
-        for file_path in file_paths:
-            if not self.is_file_referenced(file_path, exclude_note_id=note_id):
-                try:
-                    self.minio_client.remove_object(
-                        bucket_name=settings.MINIO_BUCKET_NAME,
-                        object_name=file_path
-                    )
-                    deleted_files.append(file_path)
-                except Exception as e:
-                    print(f"Error deleting file {file_path}: {e}")
-                    
-        return deleted_files
     
     def sync_note_files(self, note: LocalMessage) -> int:
         """
