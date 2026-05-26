@@ -60,27 +60,6 @@ export default function NoteList({
     }
   }, [highlightNoteId, isBusy, notes]);
 
-  const handleImportanceUpdate = async (note, increase) => {
-    window.dispatchEvent(
-      new CustomEvent("showWaitingModal", { detail: "Updating note" }),
-    );
-    try {
-      const action = increase ? "increase_importance" : "decrease_importance";
-      const url = `/api/note/message/${action}/${note.id}/`;
-      const response = await fetchWithAuth(url, { method: "POST" });
-      if (!response.ok) throw new Error("Failed to update importance");
-
-      onUpdateNote(note.id, {
-        importance: increase ? note.importance + 1 : note.importance - 1,
-      });
-      refreshNotes();
-    } catch (err) {
-      console.error("Error updating importance:", err);
-      handleApiError(err);
-    } finally {
-      window.dispatchEvent(new CustomEvent("hideWaitingModal"));
-    }
-  };
 
   const handleArchiveUpdate = async (note, archived) => {
     window.dispatchEvent(
