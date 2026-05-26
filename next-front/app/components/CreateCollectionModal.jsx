@@ -23,12 +23,12 @@ export default function CreateCollectionModal({
 
   const handleCreate = async () => {
     if (!name.trim()) {
-      showToast("Please enter a collection name", "error");
+      showToast("Error", "Please enter a collection name", 3000, "danger");
       return;
     }
 
     if (!categoryId) {
-      showToast("Please select a category", "error");
+      showToast("Error", "Please select a category", 3000, "danger");
       return;
     }
 

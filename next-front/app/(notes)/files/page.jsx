@@ -114,7 +114,12 @@ export default function FilesPage() {
         loadFiles();
       } else {
         const error = await response.json();
-        showToast(error.error || "Failed to add file to collection", "error");
+        showToast(
+          "Error",
+          error.error || "Failed to add file to collection",
+          3000,
+          "danger",
+        );
       }
     } catch (error) {
       handleApiError(error, showToast);
@@ -151,7 +156,12 @@ export default function FilesPage() {
       }
 
       const error = await response.json();
-      showToast(error.error || "Failed to delete file", "error");
+      showToast(
+        "Error",
+        error.error || "Failed to delete file",
+        3000,
+        "danger",
+      );
       loadFiles();
     } catch (error) {
       handleApiError(error, showToast);

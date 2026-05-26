@@ -2,7 +2,7 @@ import { useState, useEffect, useContext } from "react";
 import { fetchWithAuth } from "@/app/lib/api";
 import { handleApiError } from "@/app/utils/errorHandler";
 import { extractMarkdownTitle } from "@/app/utils/stringUtils";
-import { WorkspaceContext } from "../../../layout";
+import { ToastContext, WorkspaceContext } from "../../../layout";
 
 export function useNoteData(slug, noteLists) {
   const [noteBusy, setNoteBusy] = useState(true);
@@ -12,6 +12,7 @@ export function useNoteData(slug, noteLists) {
   const [noteUpdateConflict, setNoteUpdateConflict] = useState(false);
   const [shouldShowRefreshPrompt, setShouldShowRefreshPrompt] = useState(false);
   const { selectedWorkspaceSlug } = useContext(WorkspaceContext);
+  const showToast = useContext(ToastContext);
 
   const extractMarkdownTitleFromText = (text) => {
     const title = extractMarkdownTitle(text);
@@ -72,15 +73,11 @@ export function useNoteData(slug, noteLists) {
       );
       if (response.status === 409) {
         setNoteUpdateConflict(true);
-        window.dispatchEvent(
-          new CustomEvent("showToast", {
-            detail: {
-              title: "Edit Rejected",
-              body: "This note was updated elsewhere. Please refresh.",
-              delay: 7000,
-              status: "danger",
-            },
-          }),
+        showToast(
+          "Edit Rejected",
+          "This note was updated elsewhere. Please refresh.",
+          7000,
+          "danger",
         );
         return false;
       }
@@ -89,16 +86,7 @@ export function useNoteData(slug, noteLists) {
       }
       const updatedNote = await response.json();
       setNote(updatedNote);
-      window.dispatchEvent(
-        new CustomEvent("showToast", {
-          detail: {
-            title: "Success",
-            body: `Note Saved`,
-            delay: 5000,
-            variant: "success",
-          },
-        }),
-      );
+      showToast("Success", "Note Saved", 5000, "success");
       setNoteUpdateConflict(false);
       return true;
     } catch (err) {
@@ -151,7 +139,7 @@ export function useNoteData(slug, noteLists) {
         ) {
           setShouldShowRefreshPrompt(true);
         }
-      } catch {}
+      } catch { }
     }, 10000);
     return () => clearInterval(interval);
   }, [note, slug]);
