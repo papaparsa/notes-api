@@ -1,0 +1,129 @@
+---
+description: Notes app project context, features, structure, and dev operations
+alwaysApply: true
+---
+
+I have a notes app.
+
+- The app is written in django 5. using SQlite to store data, and minio, to store note attachments.
+- I have session-based authentication
+- I use django rest framework
+- I use next js for front end (more info under `.cursor/rules/next-front.mdc`). Though I am planning to migrate to react because I don't use server side features of it.
+- Also use react bootstrap 5 for the front end.
+- notes are parsed and shown as markdown
+- It has several features organized as follows:
+
+  ## Basic Note Operations
+  - editing a note
+  - note importance: allows increasing or decreasing the importance level of notes for prioritization. Backend: django-backend/note/views/note_view.py (IncreaseImportanceView, DecreaseImportanceView), URLs: increase_importance/, decrease_importance/
+  - archiving notes: enables archiving and unarchiving notes to hide/show them from main views. Backend: django-backend/note/views/note_view.py (ArchiveMessageView, UnArchiveMessageView), URLs: archive/, unarchive/
+  - note revisions: tracks and stores historical revisions of notes for change history. Backend: django-backend/note/models.py (NoteRevision), views/note_view.py (NoteRevisionView), URL: revisions/<note_id>/
+
+  ## Organization
+  - Each note belongs to only one category. the user can move notes between categories.
+  - there is a workspaces feature that lets user group categories into workspaces and allows you to focus on certain categories at a time.
+    - each category can belong to 0 to many workspaces
+  - the selected workspace is stored in the local storage of the browser. If visiting, use the default workspace from the backend
+  - file collections - separate from notes, collections organize files with thumbnail previews in feed
+  - unified feed: displays a chronological feed combining notes and file collections. Backend: django-backend/note/views/collection_view.py (UnifiedFeedView), URL: feed/
+
+  ## Content and Search
+  - linking to other notes, backlinking from them.
+  - hashtags: extracts hashtags from note text and provides trending hashtags based on usage frequency. Backend: django-backend/note/views/hashtag_view.py (TrendingHashtagsView), URL: hashtags/trending/
+  - search functionality: advanced text search with support for AND/OR queries, filtering by categories, hidden/archived status, and file presence. Backend: django-backend/note/views/search_view.py (SearchResultsView), URL: search/
+  - there is a similar notes feature that basically shows a similar notes. I'm still working to improve this
+
+  ## Sharing
+  - public notes: allows sharing notes publicly by placing them in a 'public' category. Backend: django-backend/note/views/public_note_view.py (PublicNoteView), URL: pp/
+
+  ## Reminders
+  - reminders: scheduling reminders for notes with options for frequency (once, daily, weekly, monthly).And the notifications can be sent using different methods.
+  - each reminder is associated with a note and may highlight only part of it.
+    - email reminders: sends email for scheduled reminders. Backend: django-backend/note/tasks.py (send_reminder_email Celery task)
+    - telegram reminders: sends reminder notifications to users via Telegram bot. It supports snoozing reminders. Once a reminder is dismissed, all the messages related to it will be deleted from the user's Telegram chat.
+
+  ## Data Insights
+  - statistics: provides stats on note revisions, note creation, and file access over time periods. Backend: django-backend/note/views/stats_view.py (RevisionStatsView, NoteStatsView, FileAccessStatsView), URLs: stats/revisions/, stats/notes/, stats/access/
+
+  ## File Handling
+  - file management: handles file uploads, listing, details, and serving from MinIO storage.
+
+  ### File Collections
+
+  File collections are a separate content type from notes that organize files without text content:
+  - **Model**: `FileCollection` in `django-backend/note/models.py`
+  - **Display**: Collections appear in the unified feed alongside notes in chronological order
+    - Shows thumbnail preview of first 4 files
+    - Displays file count and category name
+    - Clicking opens dedicated file manager page at `/collection/{id}`
+  - **File Manager**: Grid view page for managing collection files
+    - Upload files (drag-and-drop supported)
+    - Remove files from collection (doesn't delete file itself)
+    - View file thumbnails for images, icons for other types
+  - **File Sharing**: Files stored in MinIO can be:
+    - Referenced in notes via markdown
+    - Added to multiple collections
+    - Shared across collections and notes (same physical file, multiple references)
+    - Files stored at `uploads/{user_id}/{random_str}_{filename}` regardless of collection
+
+  ## UI/UX
+  - dark mode toggle. This is being handled using boostrap. So don't use dark, light variant
+  - session management: manages user sessions. Frontend: next-front/app/(auth)/ components
+
+current structure of the project main dirs:
+.
+├── django-backend (.venv is here)
+├── docker-compose.yml
+├── minio-data
+├── next-front
+├── nginx
+├── notes-react-native
+├── nuxt-front
+├── README.md
+
+nuxt is just old and deprecated and I'm not developing react native for now
+
+some words are used interchangably as the code have evaloved.
+category: LocalMessageList, note list
+note: LocalMessage
+
+## Development Operations
+
+### Running Scripts
+
+All scripts are located in the `scripts/` directory and must be run using the `./script` wrapper from the project root:
+
+**Format**: `./script <script_name>.sh [params]`
+
+### Database Management
+
+- **Restore database**: `./script restore_db.sh`
+- **Backup database**: `./script backup_db.sh`
+
+### Django Management Commands
+
+**Always use the dev_tools.sh wrapper for any `manage.py` commands.**
+
+**Format**: `./script dev_tools.sh <manage.py_command> [params]`
+
+Common commands:
+
+- Migrations: `./script dev_tools.sh migrate`
+- Generate embeddings: `./script dev_tools.sh generate_embeddings`
+- Any other manage.py command: `./script dev_tools.sh <command>`
+
+### Docker Configuration (Development)
+
+- Development uses a separate Docker Compose file: `docker-compose.dev.yml`
+
+## Database
+
+- the models for the main notes app are under `django-backend/note/models.py`
+- I have three separate databases that get separated by using database routers `django-backend/note/router.py`.
+- the main db is for notes, categories, users, sessions, etc
+- the embeddings db is for storing note embeddings for similar notes feature
+- the revision db is for storing note revisions
+
+## formatting
+
+- do not leave comments
