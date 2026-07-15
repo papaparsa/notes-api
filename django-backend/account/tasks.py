@@ -152,6 +152,10 @@ def check_and_send_reminders():
     from django.utils import timezone
     from django.db.models import Q
 
+    if settings.DEBUG:
+        logger.info("Skipping reminders in DEBUG mode")
+        return "Skipped in DEBUG mode"
+
     now = timezone.now()
     cooldown_threshold = now - timezone.timedelta(seconds=DISPATCH_COOLDOWN_SECONDS)
 
