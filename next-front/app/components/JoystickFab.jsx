@@ -62,14 +62,11 @@ export default function JoystickFab({
 
   const hasPrev = currentPage > 1;
   const hasNext = currentPage < totalPages;
-
-  if (totalPages <= 1) {
-    return <div className="d-xl-none">{children}</div>;
-  }
+  const showPager = totalPages > 1;
 
   return (
     <>
-      {showPageNumber && (
+      {showPager && showPageNumber && (
         <div
           className="d-xl-none"
           style={{
@@ -110,45 +107,52 @@ export default function JoystickFab({
           alignItems: "center",
         }}
       >
-        <Button
-          variant="outline-secondary"
-          className="rounded-circle"
-          style={{
-            width: "30px",
-            height: "30px",
-            padding: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            position: "absolute",
-            right: "calc(100% - 22px)",
-            opacity: hasPrev ? 0.6 : 0.2,
-            zIndex: -1,
-            border: "1.5px solid",
-            transition: "opacity 0.2s ease",
-          }}
-          disabled={!hasPrev}
-          onClick={() => onPageChange(currentPage - 1)}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M15 18l-6-6 6-6"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </Button>
+        {showPager && (
+          <Button
+            variant="outline-secondary"
+            className="rounded-circle"
+            style={{
+              width: "30px",
+              height: "30px",
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "absolute",
+              right: "calc(100% - 22px)",
+              opacity: hasPrev ? 0.6 : 0.2,
+              zIndex: -1,
+              border: "1.5px solid",
+              transition: "opacity 0.2s ease",
+            }}
+            disabled={!hasPrev}
+            onClick={() => onPageChange(currentPage - 1)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M15 18l-6-6 6-6"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </Button>
+        )}
 
         <div
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
+          onTouchStart={showPager ? handleTouchStart : undefined}
+          onTouchMove={showPager ? handleTouchMove : undefined}
+          onTouchEnd={showPager ? handleTouchEnd : undefined}
           style={{
-            transform: `translateX(${swipeOffset * 0.3}px)`,
-            transition: swipeOffset === 0 ? "transform 0.2s ease" : "none",
-            touchAction: "none",
+            transform: showPager
+              ? `translateX(${swipeOffset * 0.3}px)`
+              : undefined,
+            transition:
+              showPager && swipeOffset === 0
+                ? "transform 0.2s ease"
+                : "none",
+            touchAction: showPager ? "none" : undefined,
             position: "relative",
             zIndex: 1,
           }}
@@ -156,60 +160,64 @@ export default function JoystickFab({
           {children}
         </div>
 
-        <Button
-          variant="outline-secondary"
-          className="rounded-circle"
-          style={{
-            width: "30px",
-            height: "30px",
-            padding: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            position: "absolute",
-            left: "calc(100% - 22px)",
-            opacity: hasNext ? 0.6 : 0.2,
-            zIndex: -1,
-            border: "1.5px solid",
-            transition: "opacity 0.2s ease",
-          }}
-          disabled={!hasNext}
-          onClick={() => onPageChange(currentPage + 1)}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M9 6l6 6-6 6"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </Button>
+        {showPager && (
+          <Button
+            variant="outline-secondary"
+            className="rounded-circle"
+            style={{
+              width: "30px",
+              height: "30px",
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "absolute",
+              left: "calc(100% - 22px)",
+              opacity: hasNext ? 0.6 : 0.2,
+              zIndex: -1,
+              border: "1.5px solid",
+              transition: "opacity 0.2s ease",
+            }}
+            disabled={!hasNext}
+            onClick={() => onPageChange(currentPage + 1)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M9 6l6 6-6 6"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </Button>
+        )}
       </div>
 
-      <style jsx>{`
-        @keyframes pageFlashCenter {
-          0% {
-            opacity: 0;
-            transform: scale(0.5);
+      {showPager && (
+        <style jsx>{`
+          @keyframes pageFlashCenter {
+            0% {
+              opacity: 0;
+              transform: scale(0.5);
+            }
+            20% {
+              opacity: 0.85;
+              transform: scale(1.1);
+            }
+            35% {
+              transform: scale(1);
+            }
+            70% {
+              opacity: 0.85;
+            }
+            100% {
+              opacity: 0;
+              transform: scale(0.95);
+            }
           }
-          20% {
-            opacity: 0.85;
-            transform: scale(1.1);
-          }
-          35% {
-            transform: scale(1);
-          }
-          70% {
-            opacity: 0.85;
-          }
-          100% {
-            opacity: 0;
-            transform: scale(0.95);
-          }
-        }
-      `}</style>
+        `}</style>
+      )}
     </>
   );
 }
