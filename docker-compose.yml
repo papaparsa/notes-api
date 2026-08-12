@@ -17,6 +17,7 @@ services:
       retries: 3
     networks:
       - app-network
+    restart: unless-stopped
 
 
   redis:
@@ -30,6 +31,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   backend:
     build: django-backend
@@ -47,7 +49,7 @@ services:
       - 8.8.8.8
     networks:
       - app-network
-    
+    restart: unless-stopped
 
   celery_worker:
     build: django-backend
@@ -63,6 +65,7 @@ services:
       - app-network
     deploy:
       replicas: 1
+    restart: unless-stopped
 
   celery_beat:
     build: django-backend
@@ -78,6 +81,7 @@ services:
       - app-network
     deploy:
       replicas: 1
+    restart: unless-stopped
 
   frontend:
     build:
@@ -89,7 +93,7 @@ services:
       - app-network
     environment:
       - NODE_ENV=production
-
+    restart: unless-stopped
 
 
   webserver:
@@ -112,7 +116,7 @@ services:
       - ./django-backend/data/media:/opt/data/media
     environment:
       SERVER_NAME: ${DOMAIN_NAME} # replace with your website addreses
-
+    restart: unless-stopped
 
 
 networks:
