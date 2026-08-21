@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useContext } from "react";
+import { Suspense, useState, useEffect, useCallback, useContext } from "react";
 import { Form, FormCheck, Row, Col, Button } from "react-bootstrap";
 import { useRouter, useSearchParams } from "next/navigation";
 import NoteList from "../components/NoteList";
@@ -28,6 +28,14 @@ import {
 } from "./layout";
 
 export default function NotesPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-5">Loading...</div>}>
+      <NotesPageContent />
+    </Suspense>
+  );
+}
+
+function NotesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { workspaces, selectedWorkspaceSlug } = useContext(WorkspaceContext);

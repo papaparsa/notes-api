@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useContext, useMemo } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef, useContext, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormCheck, Row, Col, Button, Card } from "react-bootstrap";
 import NoteList from "../../components/NoteList";
@@ -16,6 +16,14 @@ import { handleApiError } from "../../utils/errorHandler";
 import { WorkspaceContext } from "../layout";
 
 export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-5">Loading...</div>}>
+      <SearchPageContent />
+    </Suspense>
+  );
+}
+
+function SearchPageContent() {
   const [notes, setNotes] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isBusy, setIsBusy] = useState(false);
