@@ -61,8 +61,8 @@ def send_login_notification(user, device_name, ip_address):
     send_email_reminder.delay(recipient_email, subject, message)
 
 
-@authentication_classes([BasicAuthentication]) 
 @api_view(['POST'])
+@authentication_classes([BasicAuthentication])
 @permission_classes([AllowAny])
 def login_view(request):
     username = request.data.get('username')
