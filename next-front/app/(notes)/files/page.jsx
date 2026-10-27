@@ -58,23 +58,24 @@ export default function FilesPage() {
   const [kindFilter, setKindFilter] = useState("all");
   const [unusedOnly, setUnusedOnly] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isDeletingFile, setIsDeletingFile] = useState(false);
 
   useEffect(() => {
     loadFiles();
     loadCollections();
   }, []);
 
-  const loadFiles = async () => {
+  const loadFiles = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await fetchWithAuth("/api/note/all-files/");
       const data = await response.json();
       setFiles(Array.isArray(data) ? data : []);
     } catch (error) {
       handleApiError(error, showToast);
-      setFiles([]);
+      if (!silent) setFiles([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -114,7 +115,7 @@ export default function FilesPage() {
       if (response.ok) {
         showToast("Success", "File added to collection", 3000, "success");
         setShowAddToCollectionModal(false);
-        loadFiles();
+        loadFiles({ silent: true });
       } else {
         const error = await response.json();
         showToast(
@@ -130,7 +131,7 @@ export default function FilesPage() {
   };
 
   const handleDeleteFile = async () => {
-    if (!selectedFile || !selectedFile.can_delete) {
+    if (!selectedFile || !selectedFile.can_delete || isDeletingFile) {
       return;
     }
 
@@ -142,19 +143,18 @@ export default function FilesPage() {
       return;
     }
 
+    const fileId = selectedFile.id;
+    setIsDeletingFile(true);
     try {
-      const response = await fetchWithAuth(
-        `/api/note/files/${selectedFile.id}/`,
-        {
-          method: "DELETE",
-        },
-      );
+      const response = await fetchWithAuth(`/api/note/files/${fileId}/`, {
+        method: "DELETE",
+      });
 
       if (response.ok) {
-        showToast("Success", "File deleted", 3000, "success");
+        setFiles((prev) => prev.filter((file) => file.id !== fileId));
         setShowDetailsModal(false);
         setSelectedFile(null);
-        loadFiles();
+        showToast("Success", "File deleted", 3000, "success");
         return;
       }
 
@@ -165,9 +165,11 @@ export default function FilesPage() {
         3000,
         "danger",
       );
-      loadFiles();
+      loadFiles({ silent: true });
     } catch (error) {
       handleApiError(error, showToast);
+    } finally {
+      setIsDeletingFile(false);
     }
   };
 
@@ -198,7 +200,9 @@ export default function FilesPage() {
         3000,
         "success",
       );
-      loadFiles();
+      setFiles((prev) =>
+        prev.filter((file) => !(file.kind === "drawing" && file.can_delete)),
+      );
     } catch (error) {
       handleApiError(error, showToast);
     } finally {
@@ -427,10 +431,15 @@ export default function FilesPage() {
                     variant="outline-danger"
                     size="sm"
                     onClick={handleDeleteFile}
+                    disabled={isDeletingFile}
                     className="ms-2"
                   >
-                    <i className="bi bi-trash me-1"></i>
-                    Delete
+                    {isDeletingFile ? (
+                      <Spinner animation="border" size="sm" className="me-1" />
+                    ) : (
+                      <i className="bi bi-trash me-1"></i>
+                    )}
+                    {isDeletingFile ? "Deleting..." : "Delete"}
                   </Button>
                 )}
               </div>
