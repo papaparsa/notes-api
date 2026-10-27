@@ -1,25 +1,32 @@
----
-description: Notes app project context, features, structure, and dev operations
-alwaysApply: true
----
+# AGENTS.md
+
+Guidance for AI coding agents working in this repository.
+
+## Agentic Flow instructions
+- never commit
+- don't run/write tests unless I tell you.
+
+
+## Project Context
 
 I have a notes app.
 
 - The app is written in django 5. using SQlite to store data, and minio, to store note attachments.
 - I have session-based authentication
 - I use django rest framework
-- I use next js for front end (more info under `.cursor/rules/next-front.mdc`). Though I am planning to migrate to react because I don't use server side features of it.
+- I use next js for front end (more info under `Next.js Frontend` below). Though I am planning to migrate to react because I don't use server side features of it.
 - Also use react bootstrap 5 for the front end.
 - notes are parsed and shown as markdown
 - It has several features organized as follows:
 
-  ## Basic Note Operations
+
+  ### Basic Note Operations
   - editing a note
   - note importance: allows increasing or decreasing the importance level of notes for prioritization. Backend: django-backend/note/views/note_view.py (IncreaseImportanceView, DecreaseImportanceView), URLs: increase_importance/, decrease_importance/
   - archiving notes: enables archiving and unarchiving notes to hide/show them from main views. Backend: django-backend/note/views/note_view.py (ArchiveMessageView, UnArchiveMessageView), URLs: archive/, unarchive/
   - note revisions: tracks and stores historical revisions of notes for change history. Backend: django-backend/note/models.py (NoteRevision), views/note_view.py (NoteRevisionView), URL: revisions/<note_id>/
 
-  ## Organization
+  ### Organization
   - Each note belongs to only one category. the user can move notes between categories.
   - there is a workspaces feature that lets user group categories into workspaces and allows you to focus on certain categories at a time.
     - each category can belong to 0 to many workspaces
@@ -27,28 +34,28 @@ I have a notes app.
   - file collections - separate from notes, collections organize files with thumbnail previews in feed
   - unified feed: displays a chronological feed combining notes and file collections. Backend: django-backend/note/views/collection_view.py (UnifiedFeedView), URL: feed/
 
-  ## Content and Search
+  ### Content and Search
   - linking to other notes, backlinking from them.
   - hashtags: extracts hashtags from note text and provides trending hashtags based on usage frequency. Backend: django-backend/note/views/hashtag_view.py (TrendingHashtagsView), URL: hashtags/trending/
   - search functionality: advanced text search with support for AND/OR queries, filtering by categories, hidden/archived status, and file presence. Backend: django-backend/note/views/search_view.py (SearchResultsView), URL: search/
   - there is a similar notes feature that basically shows a similar notes. I'm still working to improve this
 
-  ## Sharing
+  ### Sharing
   - public notes: allows sharing notes publicly by placing them in a 'public' category. Backend: django-backend/note/views/public_note_view.py (PublicNoteView), URL: pp/
 
-  ## Reminders
+  ### Reminders
   - reminders: scheduling reminders for notes with options for frequency (once, daily, weekly, monthly).And the notifications can be sent using different methods.
   - each reminder is associated with a note and may highlight only part of it.
     - email reminders: sends email for scheduled reminders. Backend: django-backend/note/tasks.py (send_reminder_email Celery task)
     - telegram reminders: sends reminder notifications to users via Telegram bot. It supports snoozing reminders. Once a reminder is dismissed, all the messages related to it will be deleted from the user's Telegram chat.
 
-  ## Data Insights
+  ### Data Insights
   - statistics: provides stats on note revisions, note creation, and file access over time periods. Backend: django-backend/note/views/stats_view.py (RevisionStatsView, NoteStatsView, FileAccessStatsView), URLs: stats/revisions/, stats/notes/, stats/access/
 
-  ## File Handling
+  ### File Handling
   - file management: handles file uploads, listing, details, and serving from MinIO storage.
 
-  ### File Collections
+  #### File Collections
 
   File collections are a separate content type from notes that organize files without text content:
   - **Model**: `FileCollection` in `django-backend/note/models.py`
@@ -66,11 +73,15 @@ I have a notes app.
     - Shared across collections and notes (same physical file, multiple references)
     - Files stored at `uploads/{user_id}/{random_str}_{filename}` regardless of collection
 
-  ## UI/UX
+  ### UI/UX
   - dark mode toggle. This is being handled using boostrap. So don't use dark, light variant
   - session management: manages user sessions. Frontend: next-front/app/(auth)/ components
 
-current structure of the project main dirs:
+### Project Structure
+
+Main directories:
+
+```
 .
 ├── django-backend (.venv is here)
 ├── docker-compose.yml
@@ -80,12 +91,13 @@ current structure of the project main dirs:
 ├── notes-react-native
 ├── nuxt-front
 ├── README.md
+```
 
 nuxt is just old and deprecated and I'm not developing react native for now
 
-some words are used interchangably as the code have evaloved.
-category: LocalMessageList, note list
-note: LocalMessage
+Some words are used interchangeably as the code has evolved:
+- category: LocalMessageList, note list
+- note: LocalMessage
 
 ## Development Operations
 
@@ -124,6 +136,17 @@ Common commands:
 - the embeddings db is for storing note embeddings for similar notes feature
 - the revision db is for storing note revisions
 
-## formatting
+## Formatting
 
 - do not leave comments
+
+## Next.js Frontend
+
+Applies to the `next-front/` folder.
+
+- Next.js (App Router). I am using it as react basically.
+- React Bootstrap
+- There are two views for rendering a note. There is the small view and the complete render. I have customized the markdown rendering.
+- The notes are organized into categories. The hashtags are clickable, so it searches for the hashtag when clicked
+- notes are usually presented in lists. Three pages use the NoteLists component: The main home page (feed), the page that shows the notes of a certain category, and the search page
+- there is a show toast function under `next-front/app/(notes)/layout.js`
