@@ -9,6 +9,8 @@ import FileUploadComponent from "./FileUploadComponent";
 import SendButton from "./SendButton";
 import RtlToggleButton from "./buttons/edit_buttons/RtlToggleButton";
 import PreviewToggleButton from "./buttons/edit_buttons/PreviewToggleButton";
+import InsertTableButton from "./buttons/edit_buttons/InsertTableButton";
+import useTableEditing from "../hooks/useTableEditing";
 import NoteTextRenderer from "./notecard/markdown/MarkdownRenderers";
 import FloatingNoteButton from "./FloatingNoteButton";
 import JoystickFab from "./JoystickFab";
@@ -30,6 +32,10 @@ export default function MessageInput({
   const [showCancelModal, setShowCancelModal] = useState(false);
   const textareaRef = useRef(null);
   const containerRef = useRef(null);
+  const { handleTableKeyDown, handleTablePaste, insertTable } = useTableEditing(
+    textareaRef,
+    setText,
+  );
 
   useEffect(() => {
     if (isExpanded && textareaRef.current) {
@@ -67,6 +73,7 @@ export default function MessageInput({
   }, [isExpanded]);
 
   const handleEnter = (e) => {
+    if (handleTableKeyDown(e)) return;
     const isCmdOrCtrl = e.ctrlKey || e.metaKey;
     if (isCmdOrCtrl && e.key === "Enter") {
       sendMessage();
@@ -116,6 +123,7 @@ export default function MessageInput({
   };
 
   const handlePaste = useCallback(async (e) => {
+    if (handleTablePaste(e)) return;
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf("image") !== -1) {
@@ -354,6 +362,8 @@ export default function MessageInput({
                 isRTL={isRTL}
                 size="sm"
               />
+
+              <InsertTableButton onInsert={insertTable} size="sm" />
 
               <PreviewToggleButton
                 isPreviewMode={isPreviewMode}

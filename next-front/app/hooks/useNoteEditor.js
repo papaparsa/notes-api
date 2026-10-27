@@ -6,6 +6,8 @@ import {
   createExcalidrawEmbedLine,
   replaceExcalidrawEmbedLine,
 } from "../utils/excalidrawEmbed";
+import { getTableModel, replaceTableInText } from "../utils/markdownTable";
+import useTableEditing from "./useTableEditing";
 
 const useNoteEditor = ({
   note,
@@ -26,7 +28,12 @@ const useNoteEditor = ({
   const [isDrawingLoading, setIsDrawingLoading] = useState(false);
   const [drawingInitialData, setDrawingInitialData] = useState(null);
   const [activeDrawing, setActiveDrawing] = useState(null);
+  const [tableEdit, setTableEdit] = useState(null);
   const editMessageTextAreaRef = useRef(null);
+  const { handleTableKeyDown, handleTablePaste, insertTable } = useTableEditing(
+    editMessageTextAreaRef,
+    setEditText,
+  );
 
   const hasUnsavedChanges = editText !== lastSavedText;
 
@@ -90,6 +97,7 @@ const useNoteEditor = ({
   };
 
   const handleEnter = (e) => {
+    if (handleTableKeyDown(e)) return;
     const isCmdOrCtrl = e.ctrlKey || e.metaKey;
     if (isCmdOrCtrl && e.key === "Enter") {
       handleSaveAndClose();
@@ -155,6 +163,7 @@ const useNoteEditor = ({
   };
 
   const handlePaste = async (e) => {
+    if (handleTablePaste(e)) return;
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf("image") !== -1) {
@@ -274,6 +283,23 @@ const useNoteEditor = ({
     } catch (err) {
       console.error("Error saving drawing:", err);
       handleApiError(err);
+    }
+  };
+
+  const openTableEditor = (index) => {
+    const table = getTableModel(editText, index);
+    if (table) setTableEdit({ index, table });
+  };
+
+  const closeTableEditor = () => setTableEdit(null);
+
+  const handleTableEditorSave = async (model) => {
+    const nextText = replaceTableInText(editText, tableEdit.index, model);
+    setEditText(nextText);
+    setTableEdit(null);
+    const saveResult = await saveHandler(nextText);
+    if (saveResult) {
+      setLastSavedText(nextText);
     }
   };
 
@@ -411,6 +437,11 @@ const useNoteEditor = ({
     hideMessage,
     unHideMessage,
     handleQuoteToggle,
+    insertTable,
+    tableEdit,
+    openTableEditor,
+    closeTableEditor,
+    handleTableEditorSave,
   };
 };
 

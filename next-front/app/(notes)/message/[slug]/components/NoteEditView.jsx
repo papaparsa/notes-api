@@ -9,6 +9,7 @@ import NoteTextRenderer from "../../../../components/notecard/markdown/MarkdownR
 import RevisionHistoryModal from "../../../../components/notecard/RevisionHistoryModal";
 import EditNoteButtons from "../../../../components/notecard/EditNoteButtons";
 import ExcalidrawOverlay from "../../../../components/notecard/ExcalidrawOverlay";
+import TableEditorModal from "../../../../components/notecard/TableEditorModal";
 import SplitViewToggleButton from "./SplitViewToggleButton";
 import { ToastContext, WorkspaceContext } from "../../../layout";
 import useNoteEditor from "../../../../hooks/useNoteEditor";
@@ -53,6 +54,11 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
     hideMessage,
     unHideMessage,
     handleQuoteToggle,
+    insertTable,
+    tableEdit,
+    openTableEditor,
+    closeTableEditor,
+    handleTableEditorSave,
   } = useNoteEditor({
     note,
     editText,
@@ -123,6 +129,7 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
           unHideMessage={unHideMessage}
           setShowRevisionModal={setShowRevisionModal}
           handleQuoteToggle={handleQuoteToggle}
+          insertTable={insertTable}
           openDrawingEditor={openDrawingEditor}
         />
 
@@ -152,6 +159,7 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
                     showToast={showToast}
                     onDeleteFile={handleDeleteEmbeddedFile}
                     onExcalidrawEdit={openExistingDrawingEditor}
+                    onTableEdit={openTableEditor}
                     workspaceSlug={selectedWorkspace?.slug}
                   />
                 </div>
@@ -168,6 +176,7 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
                     showToast={showToast}
                     onDeleteFile={handleDeleteEmbeddedFile}
                     onExcalidrawEdit={openExistingDrawingEditor}
+                    onTableEdit={openTableEditor}
                     workspaceSlug={selectedWorkspace?.slug}
                   />
                 </div>
@@ -196,6 +205,7 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
                 showToast={showToast}
                 onDeleteFile={handleDeleteEmbeddedFile}
                 onExcalidrawEdit={openExistingDrawingEditor}
+                onTableEdit={openTableEditor}
                 workspaceSlug={selectedWorkspace?.slug}
               />
             </div>
@@ -246,6 +256,13 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
         onSave={handleDrawingSave}
         initialData={drawingInitialData}
         isLoading={isDrawingLoading}
+      />
+
+      <TableEditorModal
+        show={Boolean(tableEdit)}
+        table={tableEdit?.table}
+        onHide={closeTableEditor}
+        onSave={handleTableEditorSave}
       />
     </>
   );

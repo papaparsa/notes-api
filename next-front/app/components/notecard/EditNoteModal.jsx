@@ -6,6 +6,7 @@ import NoteTextRenderer from "./markdown/MarkdownRenderers";
 import RevisionHistoryModal from "./RevisionHistoryModal";
 import EditNoteButtons from "./EditNoteButtons";
 import ExcalidrawOverlay from "./ExcalidrawOverlay";
+import TableEditorModal from "./TableEditorModal";
 import useNoteEditor from "../../hooks/useNoteEditor";
 
 const EditNoteModal = ({
@@ -58,6 +59,11 @@ const EditNoteModal = ({
     hideMessage,
     unHideMessage,
     handleQuoteToggle,
+    insertTable,
+    tableEdit,
+    openTableEditor,
+    closeTableEditor,
+    handleTableEditorSave,
   } = useNoteEditor({
     note,
     editText,
@@ -130,6 +136,7 @@ const EditNoteModal = ({
             unHideMessage={unHideMessage}
             setShowRevisionModal={setShowRevisionModal}
             handleQuoteToggle={handleQuoteToggle}
+            insertTable={insertTable}
             openDrawingEditor={openDrawingEditor}
           />
 
@@ -143,6 +150,7 @@ const EditNoteModal = ({
                   showToast={showToast}
                   onDeleteFile={handleDeleteEmbeddedFile}
                   onExcalidrawEdit={openExistingDrawingEditor}
+                  onTableEdit={openTableEditor}
                   workspaceSlug={workspaceSlug}
                 />
               </div>
@@ -203,6 +211,13 @@ const EditNoteModal = ({
         onSave={handleDrawingSave}
         initialData={drawingInitialData}
         isLoading={isDrawingLoading}
+      />
+
+      <TableEditorModal
+        show={Boolean(tableEdit)}
+        table={tableEdit?.table}
+        onHide={closeTableEditor}
+        onSave={handleTableEditorSave}
       />
     </>
   );

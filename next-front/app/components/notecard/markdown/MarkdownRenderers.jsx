@@ -14,6 +14,12 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useExternalLink } from "../ExternalLinkModal";
 import { parseExcalidrawAlt } from "../../../utils/excalidrawEmbed";
+import {
+  downloadCsv,
+  remarkTableIndex,
+  tableElementToCsv,
+  truncationIndex,
+} from "../../../utils/markdownTable";
 
 // Remark plugin to highlight text based on character indices
 export const createHighlightPlugin = (start, end) => {
@@ -116,6 +122,7 @@ export const createCustomRenderers = (
   openExternalLink,
   onDeleteFile,
   onExcalidrawEdit,
+  onTableEdit,
 ) => {
   return {
     p: (props) => <p {...props} />,
@@ -253,22 +260,55 @@ export const createCustomRenderers = (
       }
       return maybeClickableContent;
     },
-    td: (props) => {
-      // add padding to table cells
+    table: ({ node, ...props }) => {
+      const tableIndex = Number(props["data-table-index"]);
+      const canEdit =
+        typeof onTableEdit === "function" && !Number.isNaN(tableIndex);
       return (
-        <td {...props} style={{ padding: "0px 10px" }}>
-          {props.children}
-        </td>
+        <div className={styles.tableContainer}>
+          <div className={styles.tableScroll}>
+            <table
+              {...props}
+              className={`${styles.markdownTable} table table-sm table-bordered table-hover align-middle mb-0 w-auto`}
+            />
+          </div>
+          <div className={styles.tableActions}>
+            {canEdit && (
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                className={styles.tableActionButton}
+                title="Edit table"
+                onClick={() => onTableEdit(tableIndex)}
+              >
+                ✎
+              </Button>
+            )}
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              className={styles.tableActionButton}
+              title="Download as CSV"
+              onClick={(e) => {
+                const tableEl = e.currentTarget
+                  .closest(`.${styles.tableContainer}`)
+                  ?.querySelector("table");
+                if (!tableEl) return;
+                const position = Number.isNaN(tableIndex) ? 1 : tableIndex + 1;
+                downloadCsv(
+                  tableElementToCsv(tableEl),
+                  `note-${note.id ?? "draft"}-table-${position}.csv`,
+                );
+              }}
+            >
+              ⤓
+            </Button>
+          </div>
+        </div>
       );
     },
-    th: (props) => {
-      // add padding to table header cells
-      return (
-        <th {...props} style={{ padding: "0px 10px" }}>
-          {props.children}
-        </th>
-      );
-    },
+    td: ({ node, ...props }) => <td {...props} />,
+    th: ({ node, ...props }) => <th {...props} />,
   };
 };
 
@@ -303,6 +343,11 @@ const createCompactRenderers = (openExternalLink) => {
       }
       return <Link href={encodedHref}>{children}</Link>;
     },
+    table: ({ node, ...props }) => (
+      <table {...props} className={styles.compactTable} />
+    ),
+    td: ({ node, ...props }) => <td {...props} />,
+    th: ({ node, ...props }) => <th {...props} />,
   };
 };
 
@@ -368,6 +413,7 @@ const DisplayRenderer = ({
   highlightEnd = null,
   onDeleteFile = () => {},
   onExcalidrawEdit = null,
+  onTableEdit = null,
 }) => {
   const { openExternalLink } = useExternalLink();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -399,14 +445,16 @@ const DisplayRenderer = ({
     openExternalLink,
     handleDeleteClick,
     onExcalidrawEdit,
+    onTableEdit,
   );
 
-  let textToRender =
-    singleView || note.text.length < 1000 || isExpanded
-      ? note.text
-      : note.text.substring(0, 1000);
+  const cutIndex =
+    singleView || isExpanded
+      ? note.text.length
+      : truncationIndex(note.text, 1000);
+  const isTruncated = cutIndex < note.text.length;
 
-  textToRender = processTextForHashtags(textToRender);
+  const textToRender = processTextForHashtags(note.text.substring(0, cutIndex));
 
   return (
     <>
@@ -416,13 +464,13 @@ const DisplayRenderer = ({
       >
         <ReactMarkdown
           components={customRenderers}
-          remarkPlugins={[remarkGfm, highlightPlugin]}
+          remarkPlugins={[remarkGfm, highlightPlugin, remarkTableIndex]}
           className={`${isRTL(note.text) ? styles.rtlMarkdown : ""}`}
         >
           {textToRender}
         </ReactMarkdown>
 
-        {!singleView && note.text.length > 1000 && !isExpanded && (
+        {isTruncated && (
           <span
             onClick={() => onExpand()}
             className="h4 mx-2 px-1 rounded py-0 text-secondary border flex-sn-wrap"
@@ -460,6 +508,7 @@ const NoteTextRenderer = ({
   showToast = () => {},
   onDeleteFile = () => {},
   onExcalidrawEdit = null,
+  onTableEdit = null,
 }) => {
   const searchParams = useSearchParams();
   const highlightStart = searchParams
@@ -497,6 +546,7 @@ const NoteTextRenderer = ({
       highlightEnd={!isNaN(highlightEnd) ? highlightEnd : null}
       onDeleteFile={onDeleteFile}
       onExcalidrawEdit={onExcalidrawEdit}
+      onTableEdit={onTableEdit}
     />
   );
 };

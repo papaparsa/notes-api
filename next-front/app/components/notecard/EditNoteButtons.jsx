@@ -9,6 +9,7 @@ import IncreaseImportanceButton from "../buttons/edit_buttons/IncreaseImportance
 import DecreaseImportanceButton from "../buttons/edit_buttons/DecreaseImportanceButton";
 import RevisionHistoryButton from "../buttons/edit_buttons/RevisionHistoryButton";
 import QuoteToggleButton from "../buttons/edit_buttons/QuoteToggleButton";
+import InsertTableButton from "../buttons/edit_buttons/InsertTableButton";
 
 const EditNoteButtons = ({
   note,
@@ -28,6 +29,7 @@ const EditNoteButtons = ({
   unHideMessage,
   setShowRevisionModal,
   handleQuoteToggle,
+  insertTable,
   openDrawingEditor,
 }) => {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -98,6 +100,7 @@ const EditNoteButtons = ({
             className="btn-sm"
           />
           <QuoteToggleButton onClick={handleQuoteToggle} className="btn-sm" />
+          <InsertTableButton onInsert={insertTable} size="sm" />
           <Button
             variant="outline-secondary"
             onClick={openDrawingEditor}
@@ -198,6 +201,7 @@ const EditNoteButtons = ({
                 onClick={handleQuoteToggle}
                 className="btn-sm"
               />
+              <InsertTableButton onInsert={insertTable} size="sm" />
               <Button
                 variant="outline-secondary"
                 onClick={openDrawingEditor}

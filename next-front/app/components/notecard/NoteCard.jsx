@@ -16,6 +16,8 @@ import { handleApiError } from "../../utils/errorHandler";
 import { extractMarkdownTitle } from "../../utils/stringUtils";
 import NoteCardBottomBar from "./NoteCardBottomBar";
 import EditNoteModal from "./EditNoteModal";
+import TableEditorModal from "./TableEditorModal";
+import { getTableModel, replaceTableInText } from "../../utils/markdownTable";
 import NoteTextRenderer from "./markdown/MarkdownRenderers";
 import ReminderModal, { SelectableTextContainer } from "./ReminderModal";
 
@@ -33,6 +35,7 @@ const NoteCard = forwardRef(
     const [showEditModal, setShowEditModal] = useState(false);
     const [textInsideDeleteModal, setTextInsideDeleteModal] = useState("");
     const [editText, setEditText] = useState(note.text);
+    const [tableEdit, setTableEdit] = useState(null);
     const noteLists = useContext(NoteListContext);
     const [isExpanded, setIsExpanded] = useState(false);
     const [shouldLoadLinks, setShouldLoadLinks] = useState(true);
@@ -143,6 +146,17 @@ const NoteCard = forwardRef(
       }
     };
 
+    const openTableEditor = (index) => {
+      const table = getTableModel(note.text, index);
+      if (table) setTableEdit({ index, table });
+    };
+
+    const handleTableEditorSave = async (model) => {
+      const nextText = replaceTableInText(note.text, tableEdit.index, model);
+      setTableEdit(null);
+      await handleSave(nextText);
+    };
+
     const showEditModalHandler = () => {
       setEditText(note.text);
       setShowEditModal(true);
@@ -228,6 +242,7 @@ const NoteCard = forwardRef(
                 shouldLoadLinks={shouldLoadLinks}
                 showToast={showToast}
                 onDeleteFile={handleDeleteFile}
+                onTableEdit={hideEdits ? null : openTableEditor}
                 workspaceSlug={selectedWorkspaceSlug}
               />
             </div>
@@ -333,6 +348,13 @@ const NoteCard = forwardRef(
           showToast={showToast}
           refreshNotes={refreshNotes}
           workspaceSlug={selectedWorkspace?.slug}
+        />
+
+        <TableEditorModal
+          show={Boolean(tableEdit)}
+          table={tableEdit?.table}
+          onHide={() => setTableEdit(null)}
+          onSave={handleTableEditorSave}
         />
 
         <ReminderModal
