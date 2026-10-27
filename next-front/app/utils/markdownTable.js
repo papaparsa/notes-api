@@ -278,6 +278,28 @@ export const remarkTableIndex = () => (tree) => {
   );
 };
 
+const SOURCE_LINE_TYPES = new Set([
+  "paragraph",
+  "heading",
+  "code",
+  "blockquote",
+  "list",
+  "listItem",
+  "table",
+  "thematicBreak",
+  "html",
+]);
+
+export const remarkSourceLines = () => (tree) => {
+  const visit = (node) => {
+    if (SOURCE_LINE_TYPES.has(node.type) && node.position) {
+      setHProperties(node, { "data-sl": node.position.start.line });
+    }
+    node.children?.forEach(visit);
+  };
+  visit(tree);
+};
+
 export const getTableModel = (text, index) =>
   findTables(text)[index]?.model ?? null;
 

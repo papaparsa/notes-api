@@ -18,6 +18,7 @@ import { parseExcalidrawAlt } from "../../../utils/excalidrawEmbed";
 import {
   RUNNABLE_LANGUAGES,
   downloadCsv,
+  remarkSourceLines,
   remarkTableIndex,
   tableElementToCsv,
   truncationIndex,
@@ -166,6 +167,7 @@ export const createCustomRenderers = (
             language={language}
             dfIndex={Number(codeProps["data-df-index"] ?? -1)}
             snippetCount={Number(codeProps["data-snippet-count"] ?? 1)}
+            noteText={note.text}
             onCopy={copyCode}
           />
         );
@@ -432,6 +434,7 @@ const DisplayRenderer = ({
   onExcalidrawEdit = null,
   onTableEdit = null,
   allowCodeRun = true,
+  sourceLines = false,
 }) => {
   const { openExternalLink } = useExternalLink();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -484,7 +487,12 @@ const DisplayRenderer = ({
       >
         <ReactMarkdown
           components={customRenderers}
-          remarkPlugins={[remarkGfm, highlightPlugin, remarkTableIndex]}
+          remarkPlugins={[
+            remarkGfm,
+            highlightPlugin,
+            remarkTableIndex,
+            ...(sourceLines ? [remarkSourceLines] : []),
+          ]}
           className={`${isRTL(note.text) ? styles.rtlMarkdown : ""}`}
         >
           {textToRender}
@@ -530,6 +538,7 @@ const NoteTextRenderer = ({
   onExcalidrawEdit = null,
   onTableEdit = null,
   allowCodeRun = true,
+  sourceLines = false,
 }) => {
   const searchParams = useSearchParams();
   const highlightStart = searchParams
@@ -569,6 +578,7 @@ const NoteTextRenderer = ({
       onExcalidrawEdit={onExcalidrawEdit}
       onTableEdit={onTableEdit}
       allowCodeRun={allowCodeRun}
+      sourceLines={sourceLines}
     />
   );
 };

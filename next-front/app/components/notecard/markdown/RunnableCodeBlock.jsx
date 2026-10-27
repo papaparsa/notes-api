@@ -4,11 +4,62 @@ import React, { useEffect, useRef, useState } from "react";
 import { Button, Spinner } from "react-bootstrap";
 import styles from "../NoteCard.module.css";
 import { runPython } from "../../../lib/pythonRuntime";
+import { fetchWithAuth } from "../../../lib/api";
 import { downloadCsv, tableElementToCsv } from "../../../utils/markdownTable";
+import { safeUrlEncode } from "./UrlUtils";
 
 const RUN_ALL_EVENT = "runNoteSnippets";
 
+const DATA_FILE_EXTENSIONS = /\.(csv|tsv|txt|json|xlsx)$/i;
+const FILE_LINK = /(?<!!)\[([^\]]*)\]\(([^)\s]*\/api\/note\/files\/[^)\s]*)\)/g;
+const fileCache = new Map();
+
+const findDataFiles = (noteText) => {
+  const used = new Set();
+  return Array.from((noteText || "").matchAll(FILE_LINK))
+    .map(([, label, href]) => {
+      const fallback = decodeURIComponent(href.split("/").pop() || "");
+      return { label: label.trim() || fallback, href };
+    })
+    .filter(({ label }) => DATA_FILE_EXTENSIONS.test(label))
+    .map(({ label, href }) => {
+      const base = label.replace(/[\/\\]/g, "_");
+      let name = base;
+      for (let i = 2; used.has(name); i++) {
+        name = base.replace(/(\.[^.]+)$/, `_${i}$1`);
+      }
+      used.add(name);
+      return { name, href };
+    });
+};
+
+const fetchFileBytes = (href) => {
+  const url = safeUrlEncode(href);
+  if (!fileCache.has(url)) {
+    const request = fetchWithAuth(url, {}, 60000).then((response) => {
+      if (!response.ok) {
+        throw new Error(`Could not download ${url} (${response.status})`);
+      }
+      return response.arrayBuffer();
+    });
+    request.catch(() => fileCache.delete(url));
+    fileCache.set(url, request);
+  }
+  return fileCache.get(url);
+};
+
+const loadDataFiles = async (noteText) => {
+  const files = findDataFiles(noteText);
+  return Promise.all(
+    files.map(async ({ name, href }) => ({
+      name,
+      bytes: await fetchFileBytes(href),
+    })),
+  );
+};
+
 const STATUS_LABEL = {
+  files: "Fetching attached files…",
   loading: "Loading Python…",
   running: "Running…",
 };
@@ -77,6 +128,7 @@ const RunnableCodeBlock = ({
   language,
   dfIndex,
   snippetCount,
+  noteText,
   onCopy,
 }) => {
   const containerRef = useRef(null);
@@ -87,10 +139,13 @@ const RunnableCodeBlock = ({
   const run = async () => {
     if (status) return;
     const root = containerRef.current?.closest("[data-note-root]");
-    setStatus("loading");
+    setStatus("files");
     try {
+      const files = await loadDataFiles(noteText);
+      setStatus("loading");
       const output = await runPython(code, {
         usePandas,
+        files,
         tables: usePandas ? collectNoteTables(root) : [],
         dfIndex: usePandas && dfIndex >= 0 ? dfIndex : null,
         onStatus: setStatus,

@@ -53,8 +53,8 @@ def __format_error(error):
     lines += traceback.format_exception_only(type(error), error)
     return "".join(lines)
 
-def __run_snippet(code, tables_csv, df_index, use_pandas):
-    namespace = {"__name__": "__main__"}
+def __run_snippet(code, tables_csv, df_index, use_pandas, file_names):
+    namespace = {"__name__": "__main__", "files": {name: "/files/" + name for name in file_names}}
     try:
         if use_pandas:
             import pandas as pd
@@ -84,17 +84,31 @@ const ready = loadPyodide({ indexURL: "${PYODIDE_INDEX_URL}" }).then(async (pyod
 
 let queue = Promise.resolve();
 
-const run = async ({ id, code, tables, dfIndex, usePandas }) => {
+const run = async ({ id, code, tables, dfIndex, usePandas, files }) => {
   self.postMessage({ id, type: "status", status: "loading" });
   const pyodide = await ready;
   if (usePandas) await pyodide.loadPackage("pandas");
+  if (usePandas && /read_excel/.test(code)) await pyodide.loadPackage("openpyxl");
   await pyodide.loadPackagesFromImports(code);
+  pyodide.FS.mkdirTree("/files");
+  for (const name of pyodide.FS.readdir("/files")) {
+    if (name !== "." && name !== "..") pyodide.FS.unlink("/files/" + name);
+  }
+  for (const file of files) {
+    pyodide.FS.writeFile("/files/" + file.name, new Uint8Array(file.bytes));
+  }
   let stdout = "";
   pyodide.setStdout({ batched: (line) => { stdout += line + "\\n"; } });
   pyodide.setStderr({ batched: (line) => { stdout += line + "\\n"; } });
   self.postMessage({ id, type: "status", status: "running" });
   const runner = pyodide.globals.get("__run_snippet");
-  const output = runner(code, pyodide.toPy(tables), dfIndex, usePandas);
+  const output = runner(
+    code,
+    pyodide.toPy(tables),
+    dfIndex,
+    usePandas,
+    pyodide.toPy(files.map((file) => file.name)),
+  );
   runner.destroy();
   self.postMessage({ id, type: "done", result: { ...JSON.parse(output), stdout } });
 };
@@ -166,7 +180,7 @@ const getWorker = () => {
 
 export const runPython = (
   code,
-  { tables = [], dfIndex = null, usePandas = false, onStatus } = {},
+  { tables = [], dfIndex = null, usePandas = false, files = [], onStatus } = {},
 ) =>
   new Promise((resolve) => {
     const id = nextId++;
@@ -179,7 +193,7 @@ export const runPython = (
     );
     pending.set(id, { resolve, onStatus, timer });
     try {
-      getWorker().postMessage({ id, code, tables, dfIndex, usePandas });
+      getWorker().postMessage({ id, code, tables, dfIndex, usePandas, files });
     } catch (error) {
       console.error("Could not start Python", error);
       resetWorker(`Could not start Python: ${error?.message || error}`);

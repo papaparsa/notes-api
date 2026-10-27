@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useRef } from "react";
 import { Button, Modal, Row, Col } from "react-bootstrap";
 import { isRTL } from "../../../../utils/stringUtils";
 import styles from "../../../../components/notecard/NoteCard.module.css";
@@ -11,14 +11,20 @@ import EditNoteButtons from "../../../../components/notecard/EditNoteButtons";
 import ExcalidrawOverlay from "../../../../components/notecard/ExcalidrawOverlay";
 import TableEditorModal from "../../../../components/notecard/TableEditorModal";
 import SplitViewToggleButton from "./SplitViewToggleButton";
+import SyncScrollToggleButton from "./SyncScrollToggleButton";
 import { ToastContext, WorkspaceContext } from "../../../layout";
 import useNoteEditor from "../../../../hooks/useNoteEditor";
+import useScrollSync from "../../../../hooks/useScrollSync";
+
+const SCROLL_SYNC_KEY = "editorScrollSync";
 
 const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
   const showToast = useContext(ToastContext);
   const { selectedWorkspace } = useContext(WorkspaceContext);
   const [editText, setEditText] = useState(note.text);
   const [isSplitView, setIsSplitView] = useState(true);
+  const [isScrollSynced, setIsScrollSynced] = useState(true);
+  const previewRef = useRef(null);
 
   const saveHandler = async (text) => editNote(note.id, text, note.updated_at);
 
@@ -76,6 +82,30 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
     }
   };
 
+  useScrollSync(
+    editMessageTextAreaRef,
+    previewRef,
+    editText,
+    isSplitView && isScrollSynced,
+  );
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(SCROLL_SYNC_KEY) === "false") {
+        setIsScrollSynced(false);
+      }
+    } catch {}
+  }, []);
+
+  const toggleScrollSync = () => {
+    setIsScrollSynced((v) => {
+      try {
+        localStorage.setItem(SCROLL_SYNC_KEY, String(!v));
+      } catch {}
+      return !v;
+    });
+  };
+
   useEffect(() => {
     setEditText(note.text);
     setLastSavedText(note.text);
@@ -94,6 +124,12 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
         <div className="d-flex justify-content-between align-items-center mb-3">
           <h5 className="mb-0">Edit Note</h5>
           <div className="d-flex gap-2">
+            {isSplitView && (
+              <SyncScrollToggleButton
+                isSynced={isScrollSynced}
+                onToggle={toggleScrollSync}
+              />
+            )}
             <SplitViewToggleButton
               isSplitView={isSplitView}
               onToggle={() => setIsSplitView((v) => !v)}
@@ -151,7 +187,10 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
                 lg={6}
                 className={`${editStyles.previewPane} d-flex flex-column`}
               >
-                <div className={`${editStyles.previewContent} flex-grow-1`}>
+                <div
+                  ref={previewRef}
+                  className={`${editStyles.previewContent} flex-grow-1`}
+                >
                   <NoteTextRenderer
                     note={{ ...note, text: editText }}
                     singleView={true}
@@ -161,6 +200,7 @@ const NoteEditView = ({ note, editNote, onDone, refreshNotes }) => {
                     onExcalidrawEdit={openExistingDrawingEditor}
                     onTableEdit={openTableEditor}
                     workspaceSlug={selectedWorkspace?.slug}
+                    sourceLines
                   />
                 </div>
               </Col>
