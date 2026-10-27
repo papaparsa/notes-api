@@ -247,20 +247,35 @@ export const findTables = (text) =>
     model: tableNodeToModel(node, text),
   }));
 
+export const RUNNABLE_LANGUAGES = ["pandas", "python"];
+
+const setHProperties = (node, properties) => {
+  node.data = node.data || {};
+  node.data.hProperties = { ...(node.data.hProperties || {}), ...properties };
+};
+
 export const remarkTableIndex = () => (tree) => {
-  let index = 0;
+  let tableIndex = 0;
+  const snippets = [];
   const visit = (node) => {
     if (node.type === "table") {
-      node.data = node.data || {};
-      node.data.hProperties = {
-        ...(node.data.hProperties || {}),
-        "data-table-index": index++,
-      };
+      setHProperties(node, { "data-table-index": tableIndex++ });
+      return;
+    }
+    if (node.type === "code" && RUNNABLE_LANGUAGES.includes(node.lang)) {
+      setHProperties(node, {
+        "data-df-index": tableIndex - 1,
+        "data-snippet-index": snippets.length,
+      });
+      snippets.push(node);
       return;
     }
     node.children?.forEach(visit);
   };
   visit(tree);
+  snippets.forEach((node) =>
+    setHProperties(node, { "data-snippet-count": snippets.length }),
+  );
 };
 
 export const getTableModel = (text, index) =>

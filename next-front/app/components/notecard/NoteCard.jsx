@@ -243,6 +243,7 @@ const NoteCard = forwardRef(
                 showToast={showToast}
                 onDeleteFile={handleDeleteFile}
                 onTableEdit={hideEdits ? null : openTableEditor}
+                allowCodeRun={!hideEdits}
                 workspaceSlug={selectedWorkspaceSlug}
               />
             </div>

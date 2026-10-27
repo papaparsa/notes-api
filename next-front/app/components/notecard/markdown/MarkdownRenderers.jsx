@@ -9,12 +9,14 @@ import { isRTL } from "../../../utils/stringUtils";
 import { copyTextToClipboard } from "../../../utils/clipboardUtils";
 import ResponsiveImage from "./ResponsiveImage";
 import YouTubeLink from "../YouTubeLink";
+import RunnableCodeBlock from "./RunnableCodeBlock";
 import { safeUrlEncode, isExternalLink } from "./UrlUtils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useExternalLink } from "../ExternalLinkModal";
 import { parseExcalidrawAlt } from "../../../utils/excalidrawEmbed";
 import {
+  RUNNABLE_LANGUAGES,
   downloadCsv,
   remarkTableIndex,
   tableElementToCsv,
@@ -123,6 +125,7 @@ export const createCustomRenderers = (
   onDeleteFile,
   onExcalidrawEdit,
   onTableEdit,
+  allowCodeRun,
 ) => {
   return {
     p: (props) => <p {...props} />,
@@ -153,6 +156,20 @@ export const createCustomRenderers = (
         copyTextToClipboard(codeString);
         showToast("Success", "Code copied to clipboard", 3000, "success");
       };
+
+      const codeProps = React.Children.toArray(children)[0]?.props || {};
+      const language = /language-(\S+)/.exec(codeProps.className || "")?.[1];
+      if (allowCodeRun && RUNNABLE_LANGUAGES.includes(language)) {
+        return (
+          <RunnableCodeBlock
+            code={codeString}
+            language={language}
+            dfIndex={Number(codeProps["data-df-index"] ?? -1)}
+            snippetCount={Number(codeProps["data-snippet-count"] ?? 1)}
+            onCopy={copyCode}
+          />
+        );
+      }
 
       return (
         <div className={styles.codeBlockWrapper}>
@@ -414,6 +431,7 @@ const DisplayRenderer = ({
   onDeleteFile = () => {},
   onExcalidrawEdit = null,
   onTableEdit = null,
+  allowCodeRun = true,
 }) => {
   const { openExternalLink } = useExternalLink();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -446,6 +464,7 @@ const DisplayRenderer = ({
     handleDeleteClick,
     onExcalidrawEdit,
     onTableEdit,
+    allowCodeRun,
   );
 
   const cutIndex =
@@ -461,6 +480,7 @@ const DisplayRenderer = ({
       <span
         className={`card-text ${isRTL(note.text) ? "text-end" : ""}`}
         dir={isRTL(note.text) ? "rtl" : "ltr"}
+        data-note-root=""
       >
         <ReactMarkdown
           components={customRenderers}
@@ -509,6 +529,7 @@ const NoteTextRenderer = ({
   onDeleteFile = () => {},
   onExcalidrawEdit = null,
   onTableEdit = null,
+  allowCodeRun = true,
 }) => {
   const searchParams = useSearchParams();
   const highlightStart = searchParams
@@ -547,6 +568,7 @@ const NoteTextRenderer = ({
       onDeleteFile={onDeleteFile}
       onExcalidrawEdit={onExcalidrawEdit}
       onTableEdit={onTableEdit}
+      allowCodeRun={allowCodeRun}
     />
   );
 };

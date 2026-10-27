@@ -320,3 +320,15 @@ pre.codeBlock code {
   padding: 0 0.4em;
   border-bottom: 1px solid var(--bs-border-color);
 }
+
+.runnableBlock {
+  margin-bottom: 1rem;
+}
+
+.runnableResult {
+  border-radius: 0 0 0.375rem 0.375rem;
+}
+
+.runnableResult pre {
+  white-space: pre-wrap;
+}
