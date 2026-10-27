@@ -168,7 +168,12 @@ export const createCustomRenderers = (
             dfIndex={Number(codeProps["data-df-index"] ?? -1)}
             snippetCount={Number(codeProps["data-snippet-count"] ?? 1)}
             noteText={note.text}
+            noteId={note.id}
             onCopy={copyCode}
+            onCopyText={(text) => {
+              copyTextToClipboard(text);
+              showToast("Success", `Copied ${text}`, 3000, "success");
+            }}
           />
         );
       }

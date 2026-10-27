@@ -325,6 +325,12 @@ pre.codeBlock code {
   margin-bottom: 1rem;
 }
 
+.fileChip {
+  padding: 0 0.4rem;
+  font-size: 0.75rem;
+  border-radius: 1rem;
+}
+
 .runnableResult {
   border-radius: 0 0 0.375rem 0.375rem;
 }

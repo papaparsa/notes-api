@@ -13,17 +13,35 @@ const RUN_ALL_EVENT = "runNoteSnippets";
 const DATA_FILE_EXTENSIONS = /\.(csv|tsv|txt|json|xlsx)$/i;
 const FILE_LINK = /(?<!!)\[([^\]]*)\]\(([^)\s]*\/api\/note\/files\/[^)\s]*)\)/g;
 const fileCache = new Map();
+const attachedCache = new Map();
 
-const findDataFiles = (noteText) => {
-  const used = new Set();
-  return Array.from((noteText || "").matchAll(FILE_LINK))
-    .map(([, label, href]) => {
+const fileKey = (href) => {
+  const path = href.slice(href.indexOf("/api/note/files/"));
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+};
+
+const findDataFiles = (noteText, attached = []) => {
+  const linked = Array.from((noteText || "").matchAll(FILE_LINK)).map(
+    ([, label, href]) => {
       const fallback = decodeURIComponent(href.split("/").pop() || "");
       return { label: label.trim() || fallback, href };
-    })
-    .filter(({ label }) => DATA_FILE_EXTENSIONS.test(label))
+    },
+  );
+  const linkedKeys = new Set(linked.map(({ href }) => fileKey(href)));
+  const used = new Set();
+  return [
+    ...linked,
+    ...attached.filter(({ href }) => !linkedKeys.has(fileKey(href))),
+  ]
+    .filter(({ href }) => DATA_FILE_EXTENSIONS.test(fileKey(href)))
     .map(({ label, href }) => {
-      const base = label.replace(/[\/\\]/g, "_");
+      const extension = fileKey(href).match(DATA_FILE_EXTENSIONS)[0];
+      const named = DATA_FILE_EXTENSIONS.test(label) ? label : label + extension;
+      const base = named.replace(/[\/\\]/g, "_");
       let name = base;
       for (let i = 2; used.has(name); i++) {
         name = base.replace(/(\.[^.]+)$/, `_${i}$1`);
@@ -31,6 +49,42 @@ const findDataFiles = (noteText) => {
       used.add(name);
       return { name, href };
     });
+};
+
+const requestAttachedFiles = async (noteId) => {
+  try {
+    const response = await fetchWithAuth(`/api/note/message/${noteId}/files/`);
+    if (!response.ok) return [];
+    const files = await response.json();
+    return files.map((file) => ({
+      label: file.original_name || file.name,
+      href: file.url,
+    }));
+  } catch (error) {
+    console.error("Could not list attached files", error);
+    return [];
+  }
+};
+
+const fetchAttachedFiles = (noteId, refresh = false) => {
+  if (!noteId) return Promise.resolve([]);
+  if (refresh || !attachedCache.has(noteId)) {
+    attachedCache.set(noteId, requestAttachedFiles(noteId));
+  }
+  return attachedCache.get(noteId);
+};
+
+const listDataFiles = async (noteText, noteId, refresh = false) =>
+  findDataFiles(noteText, await fetchAttachedFiles(noteId, refresh));
+
+const loaderSnippet = (name) => {
+  const path = `files[${JSON.stringify(name)}]`;
+  const extension = name.split(".").pop().toLowerCase();
+  if (extension === "tsv") return `pd.read_csv(${path}, sep="\\t")`;
+  if (extension === "xlsx") return `pd.read_excel(${path})`;
+  if (extension === "json") return `pd.read_json(${path})`;
+  if (extension === "txt") return `open(${path}).read()`;
+  return `pd.read_csv(${path})`;
 };
 
 const fetchFileBytes = (href) => {
@@ -48,15 +102,13 @@ const fetchFileBytes = (href) => {
   return fileCache.get(url);
 };
 
-const loadDataFiles = async (noteText) => {
-  const files = findDataFiles(noteText);
-  return Promise.all(
+const loadDataFiles = (files) =>
+  Promise.all(
     files.map(async ({ name, href }) => ({
       name,
       bytes: await fetchFileBytes(href),
     })),
   );
-};
 
 const STATUS_LABEL = {
   files: "Fetching attached files…",
@@ -129,19 +181,34 @@ const RunnableCodeBlock = ({
   dfIndex,
   snippetCount,
   noteText,
+  noteId,
   onCopy,
+  onCopyText,
 }) => {
   const containerRef = useRef(null);
   const [status, setStatus] = useState(null);
   const [result, setResult] = useState(null);
+  const [dataFiles, setDataFiles] = useState(() => findDataFiles(noteText));
   const usePandas = language === "pandas";
+
+  useEffect(() => {
+    let active = true;
+    listDataFiles(noteText, noteId).then((files) => {
+      if (active) setDataFiles(files);
+    });
+    return () => {
+      active = false;
+    };
+  }, [noteText, noteId]);
 
   const run = async () => {
     if (status) return;
     const root = containerRef.current?.closest("[data-note-root]");
     setStatus("files");
     try {
-      const files = await loadDataFiles(noteText);
+      const listed = await listDataFiles(noteText, noteId, true);
+      setDataFiles(listed);
+      const files = await loadDataFiles(listed);
       setStatus("loading");
       const output = await runPython(code, {
         usePandas,
@@ -229,6 +296,23 @@ const RunnableCodeBlock = ({
           </span>
         )}
       </div>
+      {dataFiles.length > 0 && (
+        <div className="d-flex flex-wrap align-items-center gap-1 mb-1 small">
+          <span className="text-body-secondary">Files:</span>
+          {dataFiles.map(({ name }) => (
+            <Button
+              key={name}
+              variant="outline-secondary"
+              size="sm"
+              className={styles.fileChip}
+              title={`Copy ${loaderSnippet(name)}`}
+              onClick={() => onCopyText?.(loaderSnippet(name))}
+            >
+              📎 {name}
+            </Button>
+          ))}
+        </div>
+      )}
       <pre className={`${styles.codeBlock} bg-body border mb-0`}>
         <code className={styles.codeSnippet}>{code}</code>
       </pre>
