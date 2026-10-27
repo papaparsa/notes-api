@@ -55,6 +55,9 @@ export default function FilesPage() {
   const [selectedCollection, setSelectedCollection] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("date");
+  const [kindFilter, setKindFilter] = useState("all");
+  const [unusedOnly, setUnusedOnly] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   useEffect(() => {
     loadFiles();
@@ -168,7 +171,44 @@ export default function FilesPage() {
     }
   };
 
+  const unusedDrawingCount = files.filter(
+    (file) => file.kind === "drawing" && file.can_delete,
+  ).length;
+
+  const handleDeleteUnusedDrawings = async () => {
+    if (unusedDrawingCount === 0 || isBulkDeleting) return;
+
+    const confirmed = window.confirm(
+      `Delete ${unusedDrawingCount} unused drawing file${unusedDrawingCount !== 1 ? "s" : ""} permanently?`,
+    );
+    if (!confirmed) return;
+
+    setIsBulkDeleting(true);
+    try {
+      const response = await fetchWithAuth("/api/note/drawings/unused/", {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to delete unused drawings");
+      }
+      const data = await response.json();
+      showToast(
+        "Success",
+        `Deleted ${data.deleted_count} drawing file${data.deleted_count !== 1 ? "s" : ""}`,
+        3000,
+        "success",
+      );
+      loadFiles();
+    } catch (error) {
+      handleApiError(error, showToast);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   const filteredFiles = files
+    .filter((file) => kindFilter === "all" || file.kind === kindFilter)
+    .filter((file) => !unusedOnly || file.can_delete)
     .filter(
       (file) =>
         file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -225,6 +265,43 @@ export default function FilesPage() {
         </Col>
         <Col md={4} className="text-end">
           <Badge bg="secondary">{filteredFiles.length} files</Badge>
+        </Col>
+      </Row>
+
+      <Row className="mb-3 align-items-center">
+        <Col md={4}>
+          <Form.Select
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value)}
+          >
+            <option value="all">All Kinds</option>
+            <option value="upload">Uploads</option>
+            <option value="drawing">Drawings</option>
+          </Form.Select>
+        </Col>
+        <Col md={4}>
+          <Form.Check
+            type="switch"
+            id="unused-only-switch"
+            label="Unused only"
+            checked={unusedOnly}
+            onChange={(e) => setUnusedOnly(e.target.checked)}
+          />
+        </Col>
+        <Col md={4} className="text-end">
+          {kindFilter === "drawing" && (
+            <Button
+              variant="outline-danger"
+              size="sm"
+              onClick={handleDeleteUnusedDrawings}
+              disabled={unusedDrawingCount === 0 || isBulkDeleting}
+            >
+              <i className="bi bi-trash me-1"></i>
+              {isBulkDeleting
+                ? "Deleting..."
+                : `Delete Unused Drawings (${unusedDrawingCount})`}
+            </Button>
+          )}
         </Col>
       </Row>
 

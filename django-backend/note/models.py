@@ -179,7 +179,15 @@ class File(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='files')
     file_hash = models.CharField(max_length=64, db_index=True, null=True, blank=True)
-    
+
+    KIND_UPLOAD = 'upload'
+    KIND_DRAWING = 'drawing'
+    KIND_CHOICES = [
+        (KIND_UPLOAD, 'Upload'),
+        (KIND_DRAWING, 'Drawing'),
+    ]
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default=KIND_UPLOAD, db_index=True)
+
     class Meta:
         ordering = ['-uploaded_at']
     

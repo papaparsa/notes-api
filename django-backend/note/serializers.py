@@ -11,7 +11,7 @@ class FileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = File
-        fields = ['id', 'name', 'original_name', 'size', 'content_type', 'uploaded_at', 'url']
+        fields = ['id', 'name', 'original_name', 'size', 'content_type', 'uploaded_at', 'kind', 'url']
 
 class FileCollectionSerializer(serializers.ModelSerializer):
     thumbnail_files = serializers.SerializerMethodField()

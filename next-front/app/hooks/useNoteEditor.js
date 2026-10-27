@@ -26,7 +26,6 @@ const useNoteEditor = ({
   const [isDrawingLoading, setIsDrawingLoading] = useState(false);
   const [drawingInitialData, setDrawingInitialData] = useState(null);
   const [activeDrawing, setActiveDrawing] = useState(null);
-  const uploadedFileIdsByUrlRef = useRef({});
   const editMessageTextAreaRef = useRef(null);
 
   const hasUnsavedChanges = editText !== lastSavedText;
@@ -106,9 +105,12 @@ const useNoteEditor = ({
     }
   };
 
-  const uploadFile = async (file) => {
+  const uploadFile = async (file, kind) => {
     const formData = new FormData();
     formData.append("file", file);
+    if (kind) {
+      formData.append("kind", kind);
+    }
 
     const response = await fetchWithAuth("/api/note/upload/", {
       method: "POST",
@@ -119,11 +121,7 @@ const useNoteEditor = ({
       throw new Error("Failed to upload file");
     }
 
-    const data = await response.json();
-    if (data?.url && data?.file_id) {
-      uploadedFileIdsByUrlRef.current[data.url] = data.file_id;
-    }
-    return data;
+    return response.json();
   };
 
   const handleFileUpload = (data) => {
@@ -249,33 +247,9 @@ const useNoteEditor = ({
       );
 
       const [imageUpload, sceneUpload] = await Promise.all([
-        uploadFile(imageFile),
-        uploadFile(drawingFile),
+        uploadFile(imageFile, "drawing"),
+        uploadFile(drawingFile, "drawing"),
       ]);
-
-      const tryDeleteUploadedFileByUrl = async (url) => {
-        if (!url) return;
-        const fileId = uploadedFileIdsByUrlRef.current[url];
-        if (!fileId) return;
-
-        try {
-          const response = await fetchWithAuth(`/api/note/files/${fileId}/`, {
-            method: "DELETE",
-          });
-          if (response.ok) {
-            delete uploadedFileIdsByUrlRef.current[url];
-          }
-        } catch (err) {
-          console.error("Error deleting replaced drawing file:", err);
-        }
-      };
-
-      if (activeDrawing?.id) {
-        await Promise.all([
-          tryDeleteUploadedFileByUrl(activeDrawing.imageUrl),
-          tryDeleteUploadedFileByUrl(activeDrawing.sceneUrl),
-        ]);
-      }
 
       const drawingId = activeDrawing?.id || createExcalidrawEmbedId();
       const embedLine = createExcalidrawEmbedLine({

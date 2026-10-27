@@ -191,6 +191,10 @@ class FileUploadView(APIView):
 
         file = request.FILES['file']
         compress_image = request.POST.get('compress_image', 'false').lower() == 'true'
+        kind = request.POST.get('kind', File.KIND_UPLOAD)
+        if kind not in dict(File.KIND_CHOICES):
+            return Response({'error': 'Invalid kind'}, status=status.HTTP_400_BAD_REQUEST)
+        prefix = 'drawings' if kind == File.KIND_DRAWING else 'uploads'
         random_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
 
         if '.' in file.name:
@@ -201,11 +205,11 @@ class FileUploadView(APIView):
         if compress_image and file.content_type.startswith('image'):
             compressed_file, image_format = self.compress_image(file)
             extension = 'jpg' if image_format == 'jpeg' else image_format
-            object_name = f"uploads/{request.user.id}/compressed_{random_str}_{file.name.rsplit('.', 1)[0]}.{extension}"
+            object_name = f"{prefix}/{request.user.id}/compressed_{random_str}_{file.name.rsplit('.', 1)[0]}.{extension}"
             file_to_save = compressed_file
             content_type = f'image/{image_format}'
         else:
-            object_name = f"uploads/{request.user.id}/{random_str}_{file.name}"
+            object_name = f"{prefix}/{request.user.id}/{random_str}_{file.name}"
             file_to_save = file
             content_type = file.content_type
 
@@ -216,7 +220,7 @@ class FileUploadView(APIView):
 
         file_hash = self.compute_file_hash(file_data)
         
-        existing_file = File.objects.filter(file_hash=file_hash, user=request.user).first()
+        existing_file = File.objects.filter(file_hash=file_hash, user=request.user, kind=kind).first()
         
         if existing_file:
             note_id = request.POST.get('note_id')
@@ -255,7 +259,8 @@ class FileUploadView(APIView):
                 content_type=content_type,
                 minio_path=object_name,
                 user=request.user,
-                file_hash=file_hash
+                file_hash=file_hash,
+                kind=kind
             )
             
             note_id = request.POST.get('note_id')
@@ -341,12 +346,38 @@ class FileDetailView(APIView):
         return Response(status=204)
 
 
+class UnusedDrawingsDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        unused_drawings = File.objects.filter(
+            user=request.user,
+            kind=File.KIND_DRAWING,
+            notes__isnull=True,
+            collections__isnull=True,
+        )
+
+        deleted_count = 0
+        for file_obj in unused_drawings:
+            file_obj.delete()
+            deleted_count += 1
+
+        return Response({'deleted_count': deleted_count}, status=status.HTTP_200_OK)
+
+
 class FileListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         files = File.objects.filter(user=request.user).prefetch_related('notes', 'collections')
-        
+
+        kind = request.query_params.get('kind')
+        if kind:
+            files = files.filter(kind=kind)
+
+        if request.query_params.get('unused', 'false').lower() == 'true':
+            files = files.filter(notes__isnull=True, collections__isnull=True)
+
         file_data = []
         for file in files:
             notes = file.notes.filter(user=request.user)
@@ -361,6 +392,7 @@ class FileListView(APIView):
                 'size': file.size,
                 'content_type': file.content_type,
                 'uploaded_at': file.uploaded_at,
+                'kind': file.kind,
                 'url': f"/api/note/files/{file.minio_path}",
                 'note_count': note_count,
                 'collection_count': collection_count,
