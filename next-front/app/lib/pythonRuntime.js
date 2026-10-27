@@ -5,7 +5,7 @@ const LOAD_TIMEOUT_MS = 180000;
 const PYTHON_HELPERS = `
 import ast, io, json, os, sys, traceback, base64, warnings
 os.environ.setdefault("MPLBACKEND", "AGG")
-warnings.filterwarnings("ignore", message=".*[Pp]yarrow.*")
+warnings.filterwarnings("ignore", message=r"\\s*Pyarrow will become")
 
 MAX_ROWS = 500
 
