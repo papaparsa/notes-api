@@ -7,6 +7,7 @@ const ScrollPage = forwardRef(function ScrollPage({ children, contentContainerSt
   const { colors } = useTheme();
   const scrollRef = useRef(null);
   const [showTop, setShowTop] = useState(false);
+  const showTopRef = useRef(false);
 
   useImperativeHandle(ref, () => ({
     scrollTo: (opts) => scrollRef.current?.scrollTo(opts),
@@ -19,10 +20,13 @@ const ScrollPage = forwardRef(function ScrollPage({ children, contentContainerSt
       <ScrollView
         ref={scrollRef}
         keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={64}
+        scrollEventThrottle={100}
         onScroll={(e) => {
-          const y = e.nativeEvent.contentOffset.y;
-          setShowTop(y > 300);
+          const next = e.nativeEvent.contentOffset.y > 300;
+          if (next !== showTopRef.current) {
+            showTopRef.current = next;
+            setShowTop(next);
+          }
           onScroll?.(e);
         }}
         refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined}
