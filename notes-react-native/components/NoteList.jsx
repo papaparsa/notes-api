@@ -1,292 +1,124 @@
-// This component is now deprecated for the home page but kept for compatibility
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  FlatList, 
-  StyleSheet, 
-  ActivityIndicator, 
-  Text, 
-  TouchableOpacity,
-  Animated,
-  Modal,
-  Pressable
-} from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { useEffect, useRef } from 'react';
+import { Animated, Platform, View } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
+import { useToast, useWaiting } from '../contexts/UIContext';
+import { fetchJSON } from '../lib/api';
+import { handleApiError } from '../lib/errorHandler';
 import NoteCard from './notecard/NoteCard';
-import { colors, typography, spacing, commonStyles } from '../styles/theme';
+import { Spinner } from './ui';
 
-// Utility function to format date for display
-const formatDateDisplay = (dateString) => {
-  const date = new Date(dateString);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  
-  const formatDate = (d) => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-  
-  if (formatDate(date) === formatDate(today)) {
-    return 'Today';
-  } else if (formatDate(date) === formatDate(yesterday)) {
-    return 'Yesterday';
-  } else {
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
-  }
-};
+const native = Platform.OS !== 'web';
 
-export default function NoteList({ 
-  flatListData,
-  isBusy,
-  isLoadingMore,
-  isRefreshing,
-  newNoteId,
-  showDatePicker,
-  selectedDate,
-  onRefresh,
-  onLoadMore,
-  onDeleteNote,
-  onDatePress,
-  onDateChange,
-}) {
-  const [showTip, setShowTip] = useState(false);
+export function AnimatedNoteWrapper({ isNew, isHighlighted, children, onLayout }) {
+  const { colors } = useTheme();
+  const slide = useRef(new Animated.Value(isNew ? 0 : 1)).current;
+  const glow = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    checkFirstTime();
-  }, []);
+    if (!isNew) return;
+    slide.setValue(0);
+    glow.setValue(1);
+    Animated.parallel([
+      Animated.timing(slide, { toValue: 1, duration: 1000, useNativeDriver: native }),
+      Animated.timing(glow, { toValue: 0, duration: 1500, useNativeDriver: false }),
+    ]).start();
+  }, [isNew]);
 
-  const checkFirstTime = async () => {
-    try {
-      const hasSeenTip = await AsyncStorage.getItem('hasSeenSwipeDeleteTip');
-      if (!hasSeenTip && flatListData.some(item => item.type === 'note')) {
-        setShowTip(true);
-      }
-    } catch (error) {
-      console.error('Error checking first time:', error);
-    }
-  };
+  useEffect(() => {
+    if (!isHighlighted) return;
+    glow.setValue(1);
+    Animated.timing(glow, { toValue: 0, duration: 2000, delay: 200, useNativeDriver: false }).start();
+  }, [isHighlighted]);
 
-  const dismissTip = async () => {
-    try {
-      await AsyncStorage.setItem('hasSeenSwipeDeleteTip', 'true');
-      setShowTip(false);
-    } catch (error) {
-      console.error('Error saving tip dismissal:', error);
-    }
-  };
-
-  const renderRightActions = (progress, dragX, note) => {
-    const trans = dragX.interpolate({
-      inputRange: [-100, 0],
-      outputRange: [0, 100],
-      extrapolate: 'clamp',
-    });
-
-    return (
+  return (
+    <Animated.View
+      onLayout={onLayout}
+      style={{
+        opacity: slide,
+        transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [-30, 0] }) }, { scale: slide.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }],
+      }}
+    >
       <Animated.View
-        style={[
-          styles.deleteAction,
-          {
-            transform: [{ translateX: trans }],
-          },
-        ]}
+        style={{
+          borderRadius: 8,
+          backgroundColor: glow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(0,0,0,0)', colors.primarySubtle] }),
+          shadowColor: colors.primary,
+          shadowOpacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0, 0.4] }),
+          shadowRadius: 15,
+          shadowOffset: { width: 0, height: 0 },
+        }}
       >
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => onDeleteNote(note.id)}
-        >
-          <Text style={styles.deleteText}>Delete</Text>
-        </TouchableOpacity>
+        {children}
       </Animated.View>
-    );
-  };
+    </Animated.View>
+  );
+}
 
-  const renderItem = ({ item }) => {
-    if (item.type === 'date') {
-      return (
-        <TouchableOpacity
-          style={styles.dateHeader}
-          onPress={onDatePress}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.dateHeaderText}>{formatDateDisplay(item.date)}</Text>
-          <Text style={styles.dateHeaderIcon}>📅</Text>
-        </TouchableOpacity>
-      );
+export function useNoteMutations({ onUpdateNote, onDeleteNote }) {
+  const showToast = useToast();
+  const waiting = useWaiting();
+
+  const handleEdit = async (id, text, updatedAt) => {
+    waiting.show('Editing note');
+    try {
+      const updated = await fetchJSON(`/api/note/message/${id}/`, { method: 'PUT', body: { text, updated_at: updatedAt } });
+      onUpdateNote?.(id, updated);
+      showToast('Success', 'Note Saved', 5000, 'success');
+      return true;
+    } catch (err) {
+      if (err.status === 409) showToast('Edit Rejected', 'This note was updated elsewhere. Please refresh.', 7000, 'danger');
+      else handleApiError(err);
+      return false;
+    } finally {
+      waiting.hide();
     }
-    
-    return (
-      <Swipeable
-        renderRightActions={(progress, dragX) =>
-          renderRightActions(progress, dragX, item.data)
-        }
-        overshootRight={false}
-        friction={2}
-      >
-        <NoteCard
-          note={item.data}
-          onDelete={onDeleteNote}
-          isNew={newNoteId === item.data.id}
-        />
-      </Swipeable>
-    );
   };
 
-  const renderFooter = () => {
-    if (!isLoadingMore) return null;
-    return (
-      <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color={colors.buttonPrimary} />
-      </View>
-    );
+  const handleDelete = async (id) => {
+    waiting.show('Deleting note');
+    try {
+      const data = await fetchJSON(`/api/note/message/${id}/`, { method: 'DELETE' });
+      onDeleteNote?.(id);
+      const files = data?.deleted_files || [];
+      const extra = files.length ? `\nRemoved ${files.length} unused ${files.length === 1 ? 'file' : 'files'}: ${files.map((f) => f.split('/').pop()).join(', ')}` : '';
+      showToast('Success', `Note Deleted${extra}`, 5000, 'success');
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      waiting.hide();
+    }
   };
+
+  return { handleEdit, handleDelete };
+}
+
+export default function NoteList({ notes, isBusy, hideEdits, showHidden, onUpdateNote, onDeleteNote, refreshNotes, newNoteId, highlightNoteId, onItemLayout }) {
+  const { handleEdit, handleDelete } = useNoteMutations({ onUpdateNote, onDeleteNote });
 
   if (isBusy) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.buttonPrimary} />
+      <View style={{ alignItems: 'center', marginTop: 48 }}>
+        <Spinner />
       </View>
     );
   }
 
   return (
-    <>
-      <FlatList
-        data={flatListData}
-        renderItem={renderItem}
-        keyExtractor={(item, index) => 
-          item.type === 'date' ? `date-${item.date}` : `note-${item.data.id}`
-        }
-        onEndReached={onLoadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={renderFooter}
-        refreshing={isRefreshing}
-        onRefresh={onRefresh}
-        contentContainerStyle={styles.listContent}
-      />
-      
-      {showDatePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="default"
-          onChange={onDateChange}
-        />
+    <View style={{ marginTop: 4 }}>
+      {notes.map((note) =>
+        showHidden || !note.archived ? (
+          <AnimatedNoteWrapper key={note.id} isNew={newNoteId === note.id} isHighlighted={highlightNoteId === note.id} onLayout={onItemLayout ? (e) => onItemLayout(note.id, e.nativeEvent.layout.y) : undefined}>
+            <NoteCard
+              note={note}
+              hideEdits={hideEdits}
+              onEditNote={handleEdit}
+              onDeleteNote={handleDelete}
+              refreshNotes={refreshNotes}
+              onNoteMoved={(id, list) => onUpdateNote?.(id, { ...note, list })}
+            />
+          </AnimatedNoteWrapper>
+        ) : null,
       )}
-
-      <Modal
-        visible={showTip}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={dismissTip}
-      >
-        <Pressable style={styles.modalOverlay} onPress={dismissTip}>
-          <View style={styles.tipContainer}>
-            <Text style={styles.tipTitle}>💡 Tip</Text>
-            <Text style={styles.tipText}>
-              Swipe left on any note to delete it
-            </Text>
-            <TouchableOpacity style={styles.tipButton} onPress={dismissTip}>
-              <Text style={styles.tipButtonText}>Got it!</Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Modal>
-    </>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  listContent: {
-    padding: spacing.md,
-  },
-  dateHeader: {
-    backgroundColor: colors.backgroundSecondary,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-    marginTop: spacing.md,
-  },
-  dateHeaderText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textSecondary,
-    letterSpacing: typography.letterSpacing.wide,
-    textTransform: 'uppercase',
-  },
-  dateHeaderIcon: {
-    fontSize: typography.fontSize.base,
-  },
-  loadingContainer: {
-    ...commonStyles.loadingContainer,
-  },
-  footerLoader: {
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-  },
-  deleteAction: {
-    backgroundColor: colors.error || '#EF4444',
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    marginBottom: spacing.sm,
-  },
-  deleteButton: {
-    paddingHorizontal: spacing.xl,
-    height: '100%',
-    justifyContent: 'center',
-  },
-  deleteText: {
-    color: '#FFFFFF',
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tipContainer: {
-    backgroundColor: colors.backgroundPrimary || '#FFFFFF',
-    borderRadius: 12,
-    padding: spacing.xl,
-    marginHorizontal: spacing.xl,
-    alignItems: 'center',
-    ...commonStyles.shadow,
-  },
-  tipTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing.md,
-  },
-  tipText: {
-    fontSize: typography.fontSize.base,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  tipButton: {
-    backgroundColor: colors.buttonPrimary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: 8,
-  },
-  tipButtonText: {
-    color: '#FFFFFF',
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-  },
-});

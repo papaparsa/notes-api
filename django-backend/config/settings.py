@@ -26,7 +26,9 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-n7f6jw=gvf1x7n2v$d4p+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = int(os.environ.get("DEBUG", default=1))
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [origin for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if origin]
+CORS_ALLOW_CREDENTIALS = True
+CORS_EXPOSE_HEADERS = ["X-CSRFToken"]
 
 
 
@@ -40,6 +42,7 @@ ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")
 
 # append https to allowed hosts
 CSRF_TRUSTED_ORIGINS =   [f"https://{host}" for host in ALLOWED_HOSTS] + [f"http://{host}" for host in ALLOWED_HOSTS]
+CSRF_TRUSTED_ORIGINS += [origin for origin in os.environ.get("EXTRA_CSRF_TRUSTED_ORIGINS", "").split(",") if origin]
 
 # minio settings
 MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "localhost:9000")
@@ -110,12 +113,14 @@ INSTALLED_APPS = [
 
     'rest_framework',
     'django_celery_beat',
+    'corsheaders',
 
 ]
 
 ASGI_APPLICATION = "config.asgi.application"
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -284,6 +289,10 @@ REST_FRAMEWORK = {
 
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 30 # 1 month
+SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
+SESSION_COOKIE_SECURE = bool(int(os.environ.get("SESSION_COOKIE_SECURE", "0")))
+CSRF_COOKIE_SECURE = bool(int(os.environ.get("CSRF_COOKIE_SECURE", "0")))
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "granite-embedding:30m")

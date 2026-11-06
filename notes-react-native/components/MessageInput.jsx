@@ -1,317 +1,172 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
-} from 'react-native';
-import { colors, typography, spacing, borderRadius, shadows } from '../styles/theme';
-import Svg, { Path } from 'react-native-svg';
+import { useRef, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useApp } from '../contexts/AppContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { useToast } from '../contexts/UIContext';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { fetchJSON, uploadFile } from '../lib/api';
+import { handleApiError } from '../lib/errorHandler';
+import { readClipboardImage } from '../lib/pasteImage';
+import { fileTimestamp, isRTL } from '../lib/stringUtils';
+import { insertEmptyTable } from '../lib/tableEditing';
+import { shadow } from '../styles/theme';
+import FileUploadComponent from './FileUploadComponent';
+import FloatingNoteButton from './FloatingNoteButton';
+import JoystickFab from './JoystickFab';
+import MarkdownTextArea from './MarkdownTextArea';
+import InsertTableButton from './buttons/InsertTableButton';
+import NoteTextRenderer from './notecard/markdown/MarkdownRenderers';
+import { Button, ConfirmModal } from './ui';
 
-export default function MessageInput({ onSend, listSlug = null }) {
+export default function MessageInput({ listSlug, onNoteCreated, currentPage, totalPages, onPageChange }) {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { lg } = useBreakpoint();
+  const showToast = useToast();
+  const { selectedWorkspaceSlug } = useApp();
+  const [expanded, setExpanded] = useState(false);
   const [text, setText] = useState('');
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [justSent, setJustSent] = useState(false);
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const slideAnim = useRef(new Animated.Value(300)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const textInputRef = useRef(null);
+  const [rtlOverride, setRtlOverride] = useState(null);
+  const [preview, setPreview] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [pulse, setPulse] = useState(0);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const inputRef = useRef(null);
 
-  useEffect(() => {
-    const keyboardWillShow = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        setKeyboardOffset(e.endCoordinates.height);
-      }
-    );
+  const rtl = rtlOverride ?? isRTL(text);
 
-    const keyboardWillHide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      (e) => {
-        setKeyboardOffset(0);
-      }
-    );
-
-    return () => {
-      keyboardWillShow.remove();
-      keyboardWillHide.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isExpanded) {
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 8,
-      }).start();
-      
-      setTimeout(() => {
-        textInputRef.current?.focus();
-      }, 300);
-    } else {
-      Animated.spring(slideAnim, {
-        toValue: 300,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 8,
-      }).start();
-    }
-  }, [isExpanded]);
-
-  useEffect(() => {
-    if (justSent) {
-      Animated.sequence([
-        Animated.timing(scaleAnim, {
-          toValue: 1.1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      setTimeout(() => setJustSent(false), 2000);
-    }
-  }, [justSent]);
-
-  const handleExpand = () => {
-    setIsExpanded(true);
+  const close = () => {
+    setExpanded(false);
+    setPreview(false);
+    setRtlOverride(null);
   };
 
-  const handleCollapse = () => {
-    if (!text.trim()) {
-      Keyboard.dismiss();
-      setIsExpanded(false);
-    }
+  const requestClose = () => {
+    if (text.trim()) setConfirmDiscard(true);
+    else close();
   };
 
-  const handleSend = async () => {
-    if (!text.trim()) return;
-
+  const send = async () => {
+    if (!text.trim() || sending || uploading) return;
+    setSending(true);
     try {
-      await onSend(text);
+      const note = await fetchJSON(`/api/note/${encodeURIComponent(listSlug || 'All')}/`, { method: 'POST', body: { text, workspace: selectedWorkspaceSlug || undefined } });
+      onNoteCreated?.({ ...note, type: 'note' });
       setText('');
-      setIsExpanded(false);
-      setJustSent(true);
-      Keyboard.dismiss();
-    } catch (error) {
-      console.error('Error sending message:', error);
+      setSent(true);
+      setTimeout(() => setSent(false), 2000);
+      setPulse((p) => p + 1);
+      close();
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      setSending(false);
     }
   };
 
-  const handleCancel = () => {
-    setText('');
-    setIsExpanded(false);
-    Keyboard.dismiss();
+  const uploadPasted = async (file) => {
+    setUploading(true);
+    try {
+      const data = await uploadFile({ ...file, name: `pasted_image_${fileTimestamp()}.png` });
+      setText((prev) => prev + (prev ? '\n' : '') + `![${data.file_name}](${data.url})`);
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      setUploading(false);
+    }
   };
 
-  if (!isExpanded) {
-    return (
-      <Animated.View
-        style={[
-          styles.fabContainer,
-          {
-            transform: [{ scale: scaleAnim }],
-            backgroundColor: justSent ? colors.success : colors.buttonPrimary,
-            bottom: spacing.xl + keyboardOffset,
-          },
-        ]}
-      >
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={handleExpand}
-          activeOpacity={0.8}
-        >
-          <Svg width="28" height="28" viewBox="0 0 25 25" fill="none">
-            <Path
-              d="M17 6L19 8M14 5.5H5.5V19.5H19.5V11M9 16L9.5 13.5L19 4L21 6L11.5 15.5L9 16Z"
-              stroke={colors.white}
-              strokeWidth="1.5"
-            />
-          </Svg>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  }
+  const pasteImage = async () => {
+    const img = await readClipboardImage().catch(() => null);
+    if (img) uploadPasted(img);
+    else showToast('Paste', 'No image in clipboard', 2500, 'warning');
+  };
+
+  const insertTable = (rows, cols) => {
+    const sel = inputRef.current?.getSelection?.() || { start: text.length, end: text.length };
+    const result = insertEmptyTable(text, sel.start, sel.end, rows, cols);
+    if (inputRef.current?.isMounted?.() && !preview) inputRef.current.applyEdit(result);
+    else setText(result.text);
+  };
+
+  const fab = <FloatingNoteButton inline={!lg && !!onPageChange} onPress={() => setExpanded(true)} pulse={pulse} />;
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <Animated.View
-        style={[
-          styles.expandedContainer,
-          {
-            transform: [{ translateY: slideAnim }],
-            bottom: spacing.xl + keyboardOffset,
-          },
-        ]}
-      >
-        <View style={styles.card}>
-          <View style={styles.header}>
-            <View style={styles.headerTitle}>
-              <View style={[styles.indicator, justSent && styles.indicatorSuccess]} />
+    <>
+      {!expanded ? (
+        !lg && onPageChange ? (
+          <JoystickFab currentPage={currentPage} totalPages={totalPages} onPageChange={onPageChange}>
+            {fab}
+          </JoystickFab>
+        ) : (
+          fab
+        )
+      ) : null}
+      <Modal visible={expanded} transparent animationType="slide" onRequestClose={requestClose}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable style={{ flex: 1 }} onPress={requestClose} />
+          <View style={{ paddingHorizontal: 20, paddingBottom: 20 + insets.bottom, alignItems: 'center' }}>
+            <View style={[{ width: '100%', maxWidth: 800, backgroundColor: colors.bodyBg, borderRadius: 8, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }, shadow(2)]}>
+              <View style={{ paddingVertical: 8, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.tertiaryBg }}>
+                <Text style={{ color: sent ? '#198754' : colors.text, fontWeight: '500' }}>{sent ? '✓ Note Sent!' : 'New Note'}</Text>
+                <Pressable onPress={requestClose} accessibilityLabel="Minimize" hitSlop={10}>
+                  <Ionicons name="remove" size={22} color={colors.muted} />
+                </Pressable>
+              </View>
+              {preview ? (
+                <ScrollView style={{ minHeight: 120, maxHeight: 300 }} contentContainerStyle={{ padding: 16 }}>
+                  <NoteTextRenderer text={text} note={{ text }} singleView shouldLoadLinks={false} allowCodeRun={false} />
+                </ScrollView>
+              ) : (
+                <MarkdownTextArea
+                  ref={inputRef}
+                  value={text}
+                  onChangeText={setText}
+                  rtl={rtl}
+                  autoFocus
+                  editable={!uploading}
+                  placeholder="What's on your mind?"
+                  minHeight={120}
+                  maxHeight={300}
+                  onSaveAndClose={send}
+                  onPasteImage={uploadPasted}
+                />
+              )}
+              <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <FileUploadComponent onSuccess={(data) => setText((prev) => prev + (prev ? '\n' : '') + `[${data.file_name}](${encodeURI(decodeURIComponent(data.url))})`)} />
+                  <Button size="sm" variant="outline-secondary" icon="clipboard-outline" onPress={pasteImage} accessibilityLabel="Paste image" />
+                  <Button size="sm" variant="outline-secondary" title={rtl ? 'RTL' : 'LTR'} onPress={() => setRtlOverride(!rtl)} accessibilityLabel="Toggle text direction" />
+                  <InsertTableButton onInsert={insertTable} />
+                  <Button size="sm" variant={preview ? 'primary' : 'outline-secondary'} icon="eye-outline" onPress={() => setPreview((v) => !v)} accessibilityLabel="Toggle preview" />
+                  {uploading ? <ActivityIndicator size="small" /> : null}
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Button variant="outline-secondary" title="Cancel" onPress={requestClose} />
+                  <Button onPress={send} disabled={!text.trim() || sending || uploading} loading={sending} icon={sending ? undefined : 'paper-plane'} title="Send" />
+                </View>
+              </View>
             </View>
-            <TouchableOpacity
-              onPress={handleCollapse}
-              disabled={!!text.trim()}
-              style={styles.minimizeButton}
-            >
-              <Svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <Path
-                  d="M5 12H19"
-                  stroke={text.trim() ? colors.textTertiary : colors.textPrimary}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </Svg>
-            </TouchableOpacity>
           </View>
-
-          <TextInput
-            ref={textInputRef}
-            style={styles.textInput}
-            placeholder="What's on your mind?"
-            placeholderTextColor={colors.textTertiary}
-            value={text}
-            onChangeText={setText}
-            multiline
-            textAlignVertical="top"
-          />
-
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={handleCancel}
-              disabled={!!text.trim()}
-            >
-              <Svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <Path
-                  d="M18 6L6 18M6 6L18 18"
-                  stroke={text.trim() ? colors.textTertiary : colors.textPrimary}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </Svg>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.sendButton,
-                !text.trim() && styles.sendButtonDisabled,
-              ]}
-              onPress={handleSend}
-              disabled={!text.trim()}
-              activeOpacity={0.8}
-            >
-              <Svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <Path
-                  d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"
-                  stroke={colors.white}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </Svg>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Animated.View>
-    </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+        <ConfirmModal
+          visible={confirmDiscard}
+          title="Discard Note?"
+          body="You have unsaved text. Are you sure you want to discard it?"
+          cancelLabel="Keep Editing"
+          confirmLabel="Discard"
+          onCancel={() => setConfirmDiscard(false)}
+          onConfirm={() => {
+            setConfirmDiscard(false);
+            setText('');
+            close();
+          }}
+        />
+      </Modal>
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  fabContainer: {
-    position: 'absolute',
-    right: spacing.xl,
-    borderRadius: 30,
-    ...shadows.lg,
-  },
-  fab: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  expandedContainer: {
-    position: 'absolute',
-    left: spacing.xl,
-    right: spacing.xl,
-    zIndex: 1000,
-  },
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    ...shadows.lg,
-    overflow: 'hidden',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  headerTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  indicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.buttonPrimary,
-  },
-  indicatorSuccess: {
-    backgroundColor: colors.success,
-  },
-  minimizeButton: {
-    padding: spacing.sm,
-  },
-  textInput: {
-    minHeight: 120,
-    maxHeight: 300,
-    padding: spacing.lg,
-    fontSize: typography.fontSize.base,
-    color: colors.textPrimary,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-  },
-  button: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: colors.backgroundSecondary,
-  },
-  sendButton: {
-    backgroundColor: colors.buttonPrimary,
-    ...shadows.sm,
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.buttonDisabled,
-  },
-});

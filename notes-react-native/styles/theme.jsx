@@ -1,287 +1,71 @@
-import { StyleSheet } from 'react-native';
+import { Platform } from 'react-native';
 
-// Color Palette
-export const colors = {
-  // Primary Colors
-  primary: '#1A1A1A',
-  white: '#FFFFFF',
-  
-  // Background Colors
-  background: '#FFFFFF',
-  backgroundSecondary: '#FAFAFA',
-  
-  // Text Colors
-  textPrimary: '#1A1A1A',
-  textSecondary: '#6B6B6B',
-  textTertiary: '#999999',
-  
-  // Border Colors
-  border: '#E5E5E5',
-  borderLight: '#F0F0F0',
-  
-  // Status Colors
-  success: '#34C759',
-  error: '#DC3545',
-  errorLight: '#FFF5F5',
-  warning: '#FF9500',
-  info: '#007AFF',
-  
-  // Interactive Elements
-  buttonPrimary: '#1A1A1A',
-  buttonDisabled: '#B0B0B0',
-  switchActive: '#1A1A1A',
-  switchInactive: '#E5E5E5',
+export const lightColors = {
+  primary: '#0d6efd',
+  primarySubtle: '#cfe2ff',
+  primaryText: '#0a58ca',
+  secondary: '#6c757d',
+  success: '#198754',
+  successSubtle: '#d1e7dd',
+  danger: '#dc3545',
+  dangerSubtle: '#f8d7da',
+  warning: '#ffc107',
+  warningSubtle: '#fff3cd',
+  info: '#0dcaf0',
+  infoSubtle: '#cff4fc',
+  pageBg: '#f8f9fa',
+  bodyBg: '#ffffff',
+  tertiaryBg: '#f8f9fa',
+  secondaryBg: '#e9ecef',
+  text: '#212529',
+  muted: '#6c757d',
+  border: '#dee2e6',
+  onPrimary: '#ffffff',
+  mark: 'rgba(255,193,7,0.3)',
+  overlay: 'rgba(0,0,0,0.5)',
+  added: 'rgba(40,167,69,0.1)',
+  removed: 'rgba(220,53,69,0.1)',
+  shadow: '#000000',
 };
 
-// Typography
-export const typography = {
-  // Font Sizes
-  fontSize: {
-    xs: 12,
-    sm: 14,
-    base: 16,
-    lg: 18,
-    xl: 20,
-    '2xl': 24,
-    '3xl': 32,
-  },
-  
-  // Font Weights
-  fontWeight: {
-    regular: '400',
-    medium: '500',
-    semibold: '600',
-    bold: '700',
-  },
-  
-  // Letter Spacing
-  letterSpacing: {
-    tight: -0.5,
-    normal: 0,
-    wide: 0.3,
-  },
+export const darkColors = {
+  ...lightColors,
+  primarySubtle: '#031633',
+  primaryText: '#6ea8fe',
+  successSubtle: '#051b11',
+  dangerSubtle: '#2c0b0e',
+  warningSubtle: '#332701',
+  infoSubtle: '#032830',
+  pageBg: '#212529',
+  bodyBg: '#212529',
+  tertiaryBg: '#2b3035',
+  secondaryBg: '#343a40',
+  text: '#dee2e6',
+  muted: '#adb5bd',
+  border: '#495057',
+  mark: 'rgba(255,193,7,0.2)',
+  overlay: 'rgba(0,0,0,0.7)',
 };
 
-// Spacing
-export const spacing = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
-  '2xl': 32,
-  '3xl': 40,
+export const spacing = { 0: 0, 1: 4, 2: 8, 3: 16, 4: 24, 5: 48 };
+
+export const fonts = {
+  mono: Platform.select({ ios: 'Menlo', android: 'monospace', default: '"Fira Code", ui-monospace, monospace' }),
+  rtl: 'Vazir',
 };
 
-// Border Radius
-export const borderRadius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-};
+export const radius = { sm: 4, md: 6, lg: 8, xl: 12, pill: 999 };
 
-// Shadows
-export const shadows = {
-  sm: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-};
+export const breakpoints = { sm: 576, md: 768, lg: 992, xl: 1200, xxl: 1400 };
 
-// Common Component Styles
-export const commonStyles = StyleSheet.create({
-  // Container Styles
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  
-  contentContainer: {
-    padding: spacing.xl,
-  },
-  
-  // Card Styles
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    ...shadows.sm,
-  },
-  
-  // Input Styles
-  input: {
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    fontSize: typography.fontSize.base,
-    color: colors.textPrimary,
-    fontWeight: typography.fontWeight.regular,
-  },
-  
-  inputLabel: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  
-  inputContainer: {
-    marginBottom: spacing.lg,
-  },
-  
-  // Button Styles
-  button: {
-    backgroundColor: colors.buttonPrimary,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadows.lg,
-  },
-  
-  buttonDisabled: {
-    backgroundColor: colors.buttonDisabled,
-    ...shadows.sm,
-  },
-  
-  buttonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
-    letterSpacing: typography.letterSpacing.wide,
-  },
-  
-  buttonSecondary: {
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
-  
-  buttonSecondaryText: {
-    color: colors.textPrimary,
-  },
-  
-  // Text Styles
-  title: {
-    fontSize: typography.fontSize['3xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-    letterSpacing: typography.letterSpacing.tight,
-  },
-  
-  subtitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.regular,
-    color: colors.textSecondary,
-    marginBottom: spacing['3xl'],
-  },
-  
-  heading: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimary,
-  },
-  
-  bodyText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.regular,
-    color: colors.textPrimary,
-  },
-  
-  smallText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.regular,
-    color: colors.textSecondary,
-  },
-  
-  // Divider
-  divider: {
-    height: 1,
-    backgroundColor: colors.borderLight,
-    marginVertical: spacing.md,
-  },
-  
-  // Error Styles
-  errorContainer: {
-    backgroundColor: colors.errorLight,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.error,
-    borderRadius: borderRadius.sm,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  
-  errorText: {
-    color: colors.error,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-  },
-  
-  // Loading
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-  },
-  
-  // Section Header
-  sectionHeader: {
-    backgroundColor: colors.backgroundSecondary,
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  
-  sectionHeaderText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textSecondary,
-    letterSpacing: typography.letterSpacing.wide,
-    textTransform: 'uppercase',
-  },
-});
-
-// Helper function to create consistent spacing
-export const createSpacing = (multiplier = 1) => spacing.md * multiplier;
-
-// Helper function to create consistent margins
-export const margins = {
-  top: (size) => ({ marginTop: spacing[size] || spacing.md }),
-  bottom: (size) => ({ marginBottom: spacing[size] || spacing.md }),
-  left: (size) => ({ marginLeft: spacing[size] || spacing.md }),
-  right: (size) => ({ marginRight: spacing[size] || spacing.md }),
-  vertical: (size) => ({ marginVertical: spacing[size] || spacing.md }),
-  horizontal: (size) => ({ marginHorizontal: spacing[size] || spacing.md }),
-};
-
-// Helper function to create consistent padding
-export const paddings = {
-  top: (size) => ({ paddingTop: spacing[size] || spacing.md }),
-  bottom: (size) => ({ paddingBottom: spacing[size] || spacing.md }),
-  left: (size) => ({ paddingLeft: spacing[size] || spacing.md }),
-  right: (size) => ({ paddingRight: spacing[size] || spacing.md }),
-  vertical: (size) => ({ paddingVertical: spacing[size] || spacing.md }),
-  horizontal: (size) => ({ paddingHorizontal: spacing[size] || spacing.md }),
-};
+export const shadow = (level = 1) =>
+  Platform.select({
+    web: { boxShadow: level > 1 ? '0 .5rem 1rem rgba(0,0,0,.15)' : '0 .125rem .25rem rgba(0,0,0,.075)' },
+    default: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: level > 1 ? 4 : 1 },
+      shadowOpacity: level > 1 ? 0.2 : 0.08,
+      shadowRadius: level > 1 ? 8 : 2,
+      elevation: level > 1 ? 6 : 2,
+    },
+  });
