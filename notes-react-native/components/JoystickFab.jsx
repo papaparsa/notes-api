@@ -4,8 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 
-const THRESHOLD = 50;
-const MAX = 60;
+const THRESHOLD = 22;
+const FLICK_DISTANCE = 10;
+const FLICK_VELOCITY = 0.3;
+const MAX = 40;
+const BUTTON_SIZE = 40;
 
 function ArrowButton({ side, disabled, onPress }) {
   const { colors } = useTheme();
@@ -13,16 +16,17 @@ function ArrowButton({ side, disabled, onPress }) {
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      hitSlop={8}
       accessibilityLabel={side === 'left' ? 'Previous page' : 'Next page'}
       style={{
         position: 'absolute',
         top: '50%',
-        marginTop: -15,
+        marginTop: -BUTTON_SIZE / 2,
         [side === 'left' ? 'right' : 'left']: '100%',
         [side === 'left' ? 'marginRight' : 'marginLeft']: -22,
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: BUTTON_SIZE,
+        height: BUTTON_SIZE,
+        borderRadius: BUTTON_SIZE / 2,
         borderWidth: 1.5,
         borderColor: colors.secondary,
         backgroundColor: colors.bodyBg,
@@ -31,7 +35,7 @@ function ArrowButton({ side, disabled, onPress }) {
         opacity: disabled ? 0.2 : 0.6,
       }}
     >
-      <Ionicons name={side === 'left' ? 'chevron-back' : 'chevron-forward'} size={16} color={colors.secondary} />
+      <Ionicons name={side === 'left' ? 'chevron-back' : 'chevron-forward'} size={20} color={colors.secondary} />
     </Pressable>
   );
 }
@@ -61,12 +65,15 @@ export default function JoystickFab({ currentPage, totalPages, onPageChange, chi
 
   const pan = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 8 && stateRef.current.totalPages > 1,
-      onPanResponderMove: (_, g) => offset.setValue(Math.max(-MAX, Math.min(MAX, g.dx)) * 0.3),
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 5 && Math.abs(g.dx) > Math.abs(g.dy) && stateRef.current.totalPages > 1,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_, g) => offset.setValue(Math.max(-MAX, Math.min(MAX, g.dx)) * 0.5),
       onPanResponderRelease: (_, g) => {
         const { currentPage: page, totalPages: total, onPageChange: change } = stateRef.current;
-        if (g.dx > THRESHOLD && page < total) change(page + 1);
-        else if (g.dx < -THRESHOLD && page > 1) change(page - 1);
+        const next = g.dx > THRESHOLD || (g.dx > FLICK_DISTANCE && g.vx > FLICK_VELOCITY);
+        const prev = g.dx < -THRESHOLD || (g.dx < -FLICK_DISTANCE && g.vx < -FLICK_VELOCITY);
+        if (next && page < total) change(page + 1);
+        else if (prev && page > 1) change(page - 1);
         Animated.spring(offset, { toValue: 0, useNativeDriver: Platform.OS !== 'web' }).start();
       },
       onPanResponderTerminate: () => Animated.spring(offset, { toValue: 0, useNativeDriver: Platform.OS !== 'web' }).start(),

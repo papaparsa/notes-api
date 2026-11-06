@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "react-bootstrap";
 
-const SWIPE_THRESHOLD = 50;
+const SWIPE_THRESHOLD = 22;
+const MAX_OFFSET = 40;
 
 export default function JoystickFab({
   children,
@@ -36,7 +37,7 @@ export default function JoystickFab({
     (e) => {
       if (touchStartX.current === null || swiped.current) return;
       const deltaX = e.touches[0].clientX - touchStartX.current;
-      const clampedOffset = Math.max(-60, Math.min(60, deltaX));
+      const clampedOffset = Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, deltaX));
       setSwipeOffset(clampedOffset);
 
       if (deltaX > SWIPE_THRESHOLD && currentPage < totalPages) {
@@ -112,8 +113,8 @@ export default function JoystickFab({
             variant="outline-secondary"
             className="rounded-circle"
             style={{
-              width: "30px",
-              height: "30px",
+              width: "40px",
+              height: "40px",
               padding: 0,
               display: "flex",
               alignItems: "center",
@@ -128,7 +129,7 @@ export default function JoystickFab({
             disabled={!hasPrev}
             onClick={() => onPageChange(currentPage - 1)}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path
                 d="M15 18l-6-6 6-6"
                 stroke="currentColor"
@@ -146,7 +147,7 @@ export default function JoystickFab({
           onTouchEnd={showPager ? handleTouchEnd : undefined}
           style={{
             transform: showPager
-              ? `translateX(${swipeOffset * 0.3}px)`
+              ? `translateX(${swipeOffset * 0.5}px)`
               : undefined,
             transition:
               showPager && swipeOffset === 0
@@ -165,8 +166,8 @@ export default function JoystickFab({
             variant="outline-secondary"
             className="rounded-circle"
             style={{
-              width: "30px",
-              height: "30px",
+              width: "40px",
+              height: "40px",
               padding: 0,
               display: "flex",
               alignItems: "center",
@@ -181,7 +182,7 @@ export default function JoystickFab({
             disabled={!hasNext}
             onClick={() => onPageChange(currentPage + 1)}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path
                 d="M9 6l6 6-6 6"
                 stroke="currentColor"
